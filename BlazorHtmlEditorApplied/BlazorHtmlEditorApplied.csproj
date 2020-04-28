@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TypeScriptCompileBlocked>true</TypeScriptCompileBlocked>
+    <TypeScriptToolsVersion>3.8</TypeScriptToolsVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="AngleSharp" Version="0.14.0-alpha-805" />
+    <PackageReference Include="EmbeddedBlazorContent" Version="1.10.0" />
+    <PackageReference Include="MatBlazor" Version="2.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="HtmlBuilder.Test\**" />
+    <Compile Remove="Interop\**" />
+    <Content Remove="HtmlBuilder.Test\**" />
+    <Content Remove="Interop\**" />
+    <EmbeddedResource Remove="HtmlBuilder.Test\**" />
+    <EmbeddedResource Remove="Interop\**" />
+    <None Remove="HtmlBuilder.Test\**" />
+    <None Remove="Interop\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BlazorHtmlEditor\BlazorHtmlEditor.csproj" />
+    <ProjectReference Include="..\HtmlEditableContent\HtmlEditableContent.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,49 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29911.84
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BlazorHtmlEditorApplied", "BlazorHtmlEditorApplied\BlazorHtmlEditorApplied.csproj", "{5BF4F031-C179-456E-AB8F-FBC562C0DA24}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BlazorHtmlEditor", "BlazorHtmlEditor\BlazorHtmlEditor.csproj", "{570167F3-3215-43E1-9418-218692BDE07E}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HtmlBuilder", "HtmlBuilder\HtmlBuilder.csproj", "{274B0E28-F229-4458-8D93-FFA659A16BDB}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HtmlEditableContent", "HtmlEditableContent\HtmlEditableContent.csproj", "{5E838F17-E58B-4DC3-8E96-4588C1BEB738}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HtmlBuilder.Test", "HtmlBuilder.Test\HtmlBuilder.Test.csproj", "{180382B2-4DA0-40A9-8415-351E7164D6AA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5BF4F031-C179-456E-AB8F-FBC562C0DA24}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5BF4F031-C179-456E-AB8F-FBC562C0DA24}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5BF4F031-C179-456E-AB8F-FBC562C0DA24}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5BF4F031-C179-456E-AB8F-FBC562C0DA24}.Release|Any CPU.Build.0 = Release|Any CPU
+		{570167F3-3215-43E1-9418-218692BDE07E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{570167F3-3215-43E1-9418-218692BDE07E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{570167F3-3215-43E1-9418-218692BDE07E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{570167F3-3215-43E1-9418-218692BDE07E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{274B0E28-F229-4458-8D93-FFA659A16BDB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{274B0E28-F229-4458-8D93-FFA659A16BDB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{274B0E28-F229-4458-8D93-FFA659A16BDB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{274B0E28-F229-4458-8D93-FFA659A16BDB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5E838F17-E58B-4DC3-8E96-4588C1BEB738}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5E838F17-E58B-4DC3-8E96-4588C1BEB738}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5E838F17-E58B-4DC3-8E96-4588C1BEB738}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5E838F17-E58B-4DC3-8E96-4588C1BEB738}.Release|Any CPU.Build.0 = Release|Any CPU
+		{180382B2-4DA0-40A9-8415-351E7164D6AA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{180382B2-4DA0-40A9-8415-351E7164D6AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{180382B2-4DA0-40A9-8415-351E7164D6AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{180382B2-4DA0-40A9-8415-351E7164D6AA}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {24A93220-D06E-404F-82F5-F4938464904C}
+	EndGlobalSection
+EndGlobal

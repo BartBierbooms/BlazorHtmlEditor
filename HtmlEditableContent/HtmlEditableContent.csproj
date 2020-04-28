@@ -1,0 +1,64 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <RazorLangVersion>3.0</RazorLangVersion>
+    <TypeScriptCompileBlocked>true</TypeScriptCompileBlocked>
+    <TypeScriptToolsVersion>Latest</TypeScriptToolsVersion>
+    <IsPackable>true</IsPackable>
+    <OutputType>Library</OutputType>
+    <LangVersion>8.0</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AngleSharp" Version="0.14.0-alpha-805" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- .js/.css files will be referenced via <script>/<link> tags; other content files will just be included in the app's 'dist' directory without any tags referencing them -->
+    <EmbeddedResource Include="content\**\*.js" LogicalName="blazor:js:%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="content\**\*.css" LogicalName="blazor:css:%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="content\**" Exclude="**\*.js;**\*.css" LogicalName="blazor:file:%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Interop\src\**\*.ts" Exclude="$(GlobalExclude)" />
+  </ItemGroup>
+  <ItemGroup>
+    <WebpackInputs Include="**\*.ts" Exclude="node_modules\**; **\*.d.ts" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="Interop\src\index.ts" />
+    <None Remove="Interop\src\markupelement.ts" />
+    <None Remove="Interop\src\markupelementchange.ts" />
+    <None Remove="Interop\src\markupelementrange.ts" />
+    <None Remove="Interop\src\markuprange.ts" />
+    <None Remove="Interop\src\markuptextarea.ts" />
+    <None Remove="Interop\src\markupvalue.ts" />
+  </ItemGroup>
+  <ItemGroup>
+    <WebpackInputs Remove="Interop\src\index.ts" />
+    <WebpackInputs Remove="Interop\src\markupelement.ts" />
+    <WebpackInputs Remove="Interop\src\markupelementchange.ts" />
+    <WebpackInputs Remove="Interop\src\markupelementrange.ts" />
+    <WebpackInputs Remove="Interop\src\markuprange.ts" />
+    <WebpackInputs Remove="Interop\src\markuptextarea.ts" />
+    <WebpackInputs Remove="Interop\src\markupvalue.ts" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components" Version="3.1.2" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="3.1.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\HtmlBuilder\HtmlBuilder.csproj" />
+  </ItemGroup>
+  <Target Name="EnsureNpmRestored" Condition="!Exists('node_modules')">
+    <Message Importance="high" Text="Restoring dependencies using 'npm'. This may take several minutes..." />
+    <Exec Command="npm install" />
+  </Target>
+  <!--<Target Name="RunWebpack" AfterTargets="ResolveReferences" Inputs="@(WebpackInputs)" Outputs="\blazorHtmlEditor.js" DependsOnTargets="EnsureNpmRestored">
+    <Exec Command="npm run build:debug" Condition="'$(Configuration)' == 'Debug'" />
+    <Exec Command="npm run build:production" Condition="'$(Configuration)' != 'Debug'" />
+  </Target>-->
+
+</Project>

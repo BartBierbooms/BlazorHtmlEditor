@@ -1,0 +1,83 @@
+﻿<div style="width:100%;">
+    <div class="editor-toolbar">
+        <MatSelectItem style="float:left;" Label="Paragraph" @bind-Value="@ActiveBlockElement" Items="@BlockElements" Context="context">
+            <ItemTemplate>
+                <span style="color: dimgray">@context?.Name</span>
+            </ItemTemplate>
+        </MatSelectItem>
+        <MatSelectItem style="float:left;" Label="Font" @bind-Value="@ActiveFontStyle" Items="@FontStyles" Context="context">
+            <ItemTemplate>
+                <span style="font-family: @context?.TechName">@context?.Name</span>
+            </ItemTemplate>
+        </MatSelectItem>
+        <MatIconButton Title="Bold" OnClick="RenderBold" Class="editor-toolbar-button" Icon="@MatIconNames.Format_bold"></MatIconButton>
+        <MatIconButton Title="Emphasis" OnClick="RenderEmphasis" Class="editor-toolbar-button" Icon="@MatIconNames.Format_italic"></MatIconButton>
+        @if (ShowColorGrid)
+        {
+            <MatSelectItem Title="Color" style="float:left;" Label="Color" @bind-Value="@ActiveColor" Items="@Colors" Context="context">
+                <ItemTemplate>
+                    <div class="dropdownbuttonbuttonselecteditem" style="background-color:@context.ToHtmlStyle();"></div><span style="margin-left:4px;">@context.Name</span>
+                </ItemTemplate>
+            </MatSelectItem>
+        }
+        else
+        {
+            /*Todo make separate blazor component*/
+            <button Title="Color" type="button" style="@ActiveFontColor" class="mdc-icon-button mdc-ripple-upgraded--unbounded mdc-ripple-upgraded dropdownbuttonbutton">
+                <i @onclick="RenderColor" class="material-icons" style="float:left;">format_color_text</i>
+                <i @onclick="@(() => ShowColorGrid = !ShowColorGrid)" class="material-icons" style="float:left;position: relative;top: 10px;width:20px;">arrow_drop_down</i>
+            </button>
+        }
+        @if (ShowBackGroundColorGrid)
+        {
+            <MatSelectItem Title="background color" style="float:left;" Label="Color" @bind-Value="@ActiveBackGroundColor" Items="@Colors" Context="context">
+                <ItemTemplate>
+                    <div class="dropdownbuttonbuttonselecteditem" style="background-color:@context.ToHtmlStyle();"></div><span style="margin-left:4px;">@context.Name</span>
+                </ItemTemplate>
+            </MatSelectItem>
+        }
+        else
+        {
+
+            /*Todo make separate blazor component*/
+            <button type="button" Title="Background color" style="@ActiveBackGroundFontColor" class="mdc-icon-button mdc-ripple-upgraded--unbounded mdc-ripple-upgraded dropdownbuttonbutton">
+                <i @onclick="RenderBackGroundColor" class="material-icons" style="float:left;">format_color_fill</i>
+                <i @onclick="@(() => ShowBackGroundColorGrid = !ShowBackGroundColorGrid)" class="material-icons" style="float:left;position: relative;top: 10px;width:20px;">arrow_drop_down</i>
+            </button>
+        }
+        <MatIconButton OnClick="RenderTextClearFormatting" Class="editor-toolbar-button" Title="Clear formatting" Icon="@MatIconNames.Format_clear"></MatIconButton>
+        <MatIconButton OnClick="RenderTextAlignLeft" Class="editor-toolbar-button" Title="Left align" Icon="@MatIconNames.Format_align_left"></MatIconButton>
+        <MatIconButton OnClick="RenderTextAlignRight" Class="editor-toolbar-button" Title="Right align" Icon="@MatIconNames.Format_align_right"></MatIconButton>
+        <MatIconButton OnClick="RenderTextAlignCenter" Class="editor-toolbar-button" Title="Centre align" Icon="@MatIconNames.Format_align_center"></MatIconButton>
+        <MatIconButton OnClick="RenderTextAlignJustify" Class="editor-toolbar-button" Title="Justify align" Icon="@MatIconNames.Format_align_justify"></MatIconButton>
+        <MatIconButton Disabled="DisableHRefLink" OnClick="@(() => HRefLinkDialog = true)" Title="Hyperlink" Class="editor-toolbar-button" Icon="@MatIconNames.Link"></MatIconButton>
+    </div>
+    <HtmlEditableContent.HtmlBuilderEditableContentBase Html="@html.Value"  Id="@Id" ></HtmlEditableContent.HtmlBuilderEditableContentBase>
+    <div class="editor-edit-bottom"><div>pos: @Position.PositionStart / @Position.PositionEnd <span>path: @Selector</span></div></div>
+</div>
+
+<MatDialog @bind-IsOpen="@HRefLinkDialog">
+    <MatDialogTitle>Hyperlink</MatDialogTitle>
+    <MatDialogContent>
+        <p>Description</p>
+        <MatTextField Value="@Link.Description" OnInput="@(evt=> {
+                                                               Link.Description = evt.Value.ToString();
+                                                               Link.IsValid();
+                                                           })"></MatTextField>
+        <p>Url</p>
+        <MatTextField Value="@Link.Link" OnInput="@(evt=> { Link.Link = evt.Value.ToString();
+                                                            Link.IsValid();
+                                                           })"></MatTextField>
+        <MatSelect Label="Target" @bind-Value="Link.Target">
+            <MatOptionString></MatOptionString>
+            <MatOptionString Value="_blank">Blank</MatOptionString>
+            <MatOptionString Value="_self">Self</MatOptionString>
+            <MatOptionString Value="_parent">Parent</MatOptionString>
+            <MatOptionString Value="_top">Top</MatOptionString>
+        </MatSelect>
+    </MatDialogContent>
+    <MatDialogActions>
+        <MatButton OnClick="@(() =>RenderLink(true))">Cancel</MatButton>
+        <MatButton Disabled="@(!Link.IsValid())" OnClick="@(() => RenderLink(false))">OK</MatButton>
+    </MatDialogActions>
+</MatDialog>
