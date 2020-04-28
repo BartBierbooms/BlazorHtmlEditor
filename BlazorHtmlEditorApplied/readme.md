@@ -1,5 +1,21 @@
 # HtmlEditor for Blazor
 
+# Installation and build
+see also https://www.codeproject.com/Tips/5266338/HtmlEditor-Written-in-Blazor
+In the directory with the solution file
+
+`dotnet restore`
+`dotnet build`
+
+change directory to HtmlEditablContent
+
+`npm install`
+
+run 
+
+`npm run build:debug`
+
+
 ## Preface
 I was working on an article where I needed complex logic. The article was based on a Blazor project. I decided to build an HTMLEditor prototype because it contains complex logic and implicit choices
 If only I hadn't done it, because this was more difficult than I had imagined.
