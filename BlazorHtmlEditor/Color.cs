@@ -2,7 +2,7 @@
 {
     public class Color 
     {
-        public static Color None = new Color("", -1, -1 , -1);
+        public static Color None { get; } = new Color("", -1, -1, -1);
         public string Name { get; }
         public int R { get; }
         public int G { get; }

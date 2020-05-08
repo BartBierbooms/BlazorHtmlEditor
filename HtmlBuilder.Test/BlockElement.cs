@@ -9,7 +9,7 @@ namespace HtmlBuilder.Test
     public class BlockElement
     {
         [Test]
-        public async Task Empty_SetToHeading1_HtmlIsRenderedAsHeading1()
+        public async Task EmptyHtml_SetToHeading1_HtmlIsRenderedAsHeading1()
         {
             string html = @"<div></div>";
             string assertedHtml = "<body><h1></h1></body>";
@@ -112,7 +112,7 @@ namespace HtmlBuilder.Test
         }
 
         [Test]
-        public async Task DivWithStylingAndChildNodesAndMextSibling_SetToHeading1_HtmlIsRenderedAsHeading1()
+        public async Task DivWithStylingAndChildNodesAndNextSibling_SetToHeading1_HtmlIsRenderedAsHeading1()
         {
             string html = @"<body><div style=""font-family:Courier;"">the <span style=""color:red"">red and <span style=""color:blue"">blue </span></span>source <span style=""color:orange"">from holland </span> with greetings</div><p>This is a paragraph element</p></body>";
             string assertedHtml = @"<body><h1 style=""font-family:Courier;"">the <span style=""color:red"">red and <span style=""color:blue"">blue </span></span>source <span style=""color:orange"">from holland </span> with greetings</h1><p>This is a paragraph element</p></body>";
@@ -133,7 +133,7 @@ namespace HtmlBuilder.Test
         }
 
         [Test]
-        public async Task H1WithStylingAndChildNodesAndMextSibling_SetToHeading1_HtmlIsRenderedAsDiv()
+        public async Task H1WithStylingAndChildNodesAndNextSibling_SetToHeading1_HtmlIsRenderedAsDiv()
         {
             string html = @"<body><h1 style=""font-family:Courier;"">the <span style=""color:red"">red and <span style=""color:blue"">blue </span></span>source <span style=""color:orange"">from holland </span> with greetings</h1><p>This is a paragraph element</p></body>";
             string assertedHtml = @"<body><div style=""font-family:Courier;"">the <span style=""color:red"">red and <span style=""color:blue"">blue </span></span>source <span style=""color:orange"">from holland </span> with greetings</div><p>This is a paragraph element</p></body>";
@@ -260,7 +260,7 @@ namespace HtmlBuilder.Test
         }
 
         [Test]
-        public async Task HtmlWithCaretOnSecondParagraph_setHeading1_SecondParagraphIsRenderedAsAsHeading()
+        public async Task HtmlWithCaretOnSecondParagraph_setHeading1_SecondParagraphIsRenderedAsHeading()
         {
             var html = @"<div>​first paragraphe</div><div>​second paragraphe</div>";
             string assertedHtml = @"<body><div>​first paragraphe</div><h1>​second paragraphe</h1></body>";
@@ -280,5 +280,71 @@ namespace HtmlBuilder.Test
             await Task.FromResult(0);
 
         }
+
+        [Test]
+        public async Task Div_setOrderList_DivIsRenderedAsOrderedList()
+        {
+            var html = @"<div>​first paragraphe</div>";
+            string assertedHtml = @"<body><ul><li>​first paragraphe</li></ul></body>";
+            var document = await Factory.DocumentFactory.GetDocument(html);
+            var bodyNodes = document.Body.GetDescendants();
+
+            MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 5, PositionStart = 5 };
+
+            var ranges = RangeNode.InRange(bodyNodes, selectionRange);
+            var range = ranges.First();
+
+            range.ApplyBlockCommand("OL", document);
+            var newHtml = document.Body.ToHtml();
+
+            Assert.IsTrue(ranges.Count() == 1);
+            Assert.AreEqual(newHtml, assertedHtml);
+            await Task.FromResult(0);
+
+        }
+
+        [Test]
+        public async Task Div_setUnOrderList_DivIsRenderedAsOrderedList()
+        {
+            var html = @"<div>​first paragraphe</div>";
+            string assertedHtml = @"<body><ol><li>​first paragraphe</li></ol></body>";
+            var document = await Factory.DocumentFactory.GetDocument(html);
+            var bodyNodes = document.Body.GetDescendants();
+
+            MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 5, PositionStart = 5 };
+
+            var ranges = RangeNode.InRange(bodyNodes, selectionRange);
+            var range = ranges.First();
+
+            range.ApplyBlockCommand("UL", document);
+            var newHtml = document.Body.ToHtml();
+
+            Assert.IsTrue(ranges.Count() == 1);
+            Assert.AreEqual(newHtml, assertedHtml);
+            await Task.FromResult(0);
+
+        }
+
+        //[Test]
+        //public async Task OrderedList_setNextDivToOrderedList_DivIsRenderedAsPartOfOrderedList()
+        //{
+        //    var html = @"<ol><li>​first paragraphe</li><div>Second paragraph</div></ol>";
+        //    string assertedHtml = @"<body><ol><li>​first paragraphe</li><li>Second paragraph</li></ol></body>";
+        //    var document = await Factory.DocumentFactory.GetDocument(html);
+        //    var bodyNodes = document.Body.GetDescendants();
+
+        //    MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 20, PositionStart = 20 };
+
+        //    var ranges = RangeNode.InRange(bodyNodes, selectionRange);
+        //    var range = ranges.First();
+
+        //    range.ApplyBlockCommand("UL", document);
+        //    var newHtml = document.Body.ToHtml();
+
+        //    Assert.IsTrue(ranges.Count() == 1);
+        //    Assert.AreEqual(newHtml, assertedHtml);
+        //    await Task.FromResult(0);
+
+        //}
     }
 }

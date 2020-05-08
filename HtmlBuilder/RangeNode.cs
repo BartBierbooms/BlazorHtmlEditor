@@ -9,28 +9,30 @@ namespace HtmlBuilder
 {
     public class RangeNode
     {
-        public static Func<string> ApplyAttributeValueNone = () => "";
-        public readonly INode Node;
-        public readonly int Offset;
-        private string _styleattribute = null;
+        private const string InvalidOperationErr = "No continuation function defined.";
+        internal static Func<string> ApplyAttributeValueNone = () => "";
+        public INode Node { get; private set; }
+        public int Offset { get; private set; }
+        private string styleattribute = null;
         public string StyleAttribute
         {
             get
             {
-                if (_styleattribute == null && this.Node != null)
+                if (styleattribute == null && this.Node != null)
                 {
-                    var parent = GetParentElement(Node);
+                    var parent = NodeWalkGetElement(Node) as IElement;
                     if (parent != null)
-                        _styleattribute = GetParentElement(Node).GetAttribute(HTMLConstants.Style);
+                        styleattribute = parent.GetAttribute(HTMLConstants.Style);
                 }
-                return _styleattribute;
+                return styleattribute;
             }
             private set
             {
-                _styleattribute = value;
+                styleattribute = value;
             }
         }
         public IEnumerable<StyleProperty> Styling => StyleProperties(StyleAttribute);
+        private static readonly System.Globalization.CultureInfo ciInvariant = System.Globalization.CultureInfo.InvariantCulture;
         public RangeNode(INode node, int offSet)
         {
             Node = node;
@@ -38,12 +40,17 @@ namespace HtmlBuilder
         }
         public static IEnumerable<RangeNode> InRange(IEnumerable<INode> bodyNodes, MarkUpRange range)
         {
+            if (range == null)
+                throw new ArgumentNullException(nameof(range));
+            if(bodyNodes == null)
+                throw new ArgumentNullException(nameof(bodyNodes));
+
             int offset = 0;
-            int iPosRangeStart = range.PositionStart - 1;
-            int iPosRangeEnd = range.PositionEnd - 1;
+            int iPosRangeStart = range.PositionStart == -1 ? 0 : range.PositionStart - 1;
+            int iPosRangeEnd = range.PositionEnd == -1 ? 0 : range.PositionEnd - 1;
             List<RangeNode> rangeNodes = new List<RangeNode>();
 
-            if (bodyNodes.Count() == 1 && bodyNodes.First().NodeName == HTMLConstants.SpanDiv)
+            if (bodyNodes.Count() == 1 && bodyNodes.First().NodeName == HTMLConstants.DivTag)
             {
                 rangeNodes.Add(new RangeNode(bodyNodes.First(), 0));
             }
@@ -57,14 +64,17 @@ namespace HtmlBuilder
                     if (node.NodeType == NodeType.Text)
                     {
                         string nodeText = node.TextContent;
-
                         int iNodeLength = nodeText.Length;
                         int iRange = iPosRangeEnd - iPosRangeStart;
 
                         bool rangeStartInNode = iPosRangeStart < offset || (iPosRangeStart + 1) < offset + iNodeLength;
                         bool rangeEndInNode = iPosRangeEnd >= offset || iPosRangeEnd == iPosRangeStart;
 
-                        if (rangeStartInNode && rangeEndInNode)
+                        if (iPosRangeEnd == 0 && iPosRangeStart == 0)
+                        {
+                            rangeNodes.Add(new RangeNode(node, offset));
+                        }
+                        else if (rangeStartInNode && rangeEndInNode)
                         {
                             rangeNodes.Add(new RangeNode(node, offset));
                         }
@@ -129,46 +139,124 @@ namespace HtmlBuilder
         /// <param name="document">HTMLdocument</param>
         public void ApplyBlockCommand(string blockCommand, IDocument document)
         {
-            var ret = InitWalk(Node);
-            ret = NodeWalkBack(ret, Node, GetElementNodeOfTheNode);           
-            if (ret.Success)
+            var parentNodeName = "";
+            var blockParentElement = NodeWalkFindBlockParent(Node) as IElement;
+            parentNodeName = blockParentElement.NodeName.ToLower(ciInvariant);
+
+            IElement createNewElem()
             {
-                var containingElement = ret.Node;
-                var blockParentElement = FindBlockParent(Node) as IElement;
-
-                var nodes = FindBeforeAndAfterNodes(blockParentElement, containingElement);
-                var nodesAfter = nodes.nodesAfter;
-                var nodesBefore = nodes.nodesBefore;
-                IElement elem;
-
-                if (string.IsNullOrEmpty(blockCommand) || blockCommand.ToLower() == blockParentElement.NodeName.ToLower())
+                if (string.IsNullOrEmpty(blockCommand) 
+                    || blockCommand.ToLower(ciInvariant) == parentNodeName
+                    || (parentNodeName.ToUpper(ciInvariant) == HTMLConstants.LiTag && 
+                        (blockCommand == HTMLConstants.UlTag || blockCommand == HTMLConstants.OlTag)))
                 {
-                    elem = document.CreateElement("div");
+                    return  document.CreateElement("div");
                 }
                 else
                 {
-                    elem = document.CreateElement(blockCommand);
+                    if (blockCommand == HTMLConstants.UlTag || blockCommand == HTMLConstants.OlTag)
+                    {
+                        var list = CreateListHolder(document, blockCommand == HTMLConstants.UlTag);
+                        var listchild = document.CreateElement(HTMLConstants.LiTag);
+                        list.AppendChild(listchild);
+                        return list;
+                    }
+                    else
+                    {
+                        return document.CreateElement(blockCommand);
+                    }
                 }
-                CopyAttributes(blockParentElement, elem);
+            }
+
+            ParentInsertNewElement(blockParentElement, createNewElem);
+
+        }
+
+        private void ParentInsertNewElement(IElement blockParentElement, Func<IElement> createElement)
+        {
+            var walkFindElementOfNode = InitWalk(Node);
+            walkFindElementOfNode = NodeWalkBack(walkFindElementOfNode, Node, FindElementNode);
+            if (walkFindElementOfNode.Success)
+            {
+                var containingElement = walkFindElementOfNode.Node;
+                (INode[] nodesBefore, INode[] nodesAfter) nodes;
+                if (containingElement.NodeName == HTMLConstants.LiTag)
+                {
+                    nodes = FindBeforeAndAfterNodes(blockParentElement, Node);
+                    blockParentElement = blockParentElement.ParentElement;
+                }
+                else
+                {
+                    //blockparent
+                    nodes = FindBeforeAndAfterNodes(blockParentElement, containingElement);
+                }
+
+                var nodesAfter = nodes.nodesAfter;
+                var nodesBefore = nodes.nodesBefore;
+                IElement elem = createElement();
+                var isComposite = elem.FirstChild != null;
+
+                CopyAttributes(walkFindElementOfNode.Node as IElement, elem);
+                
                 if (!nodesBefore.Any() && !nodesAfter.Any())
                 {
-                    elem.TextContent = Node.TextContent;
+                    if (isComposite)
+                    {
+                        elem.FirstChild.TextContent = Node.TextContent;
+                    }
+                    else 
+                    {
+                        elem.AppendNodes(containingElement.ChildNodes.ToArray());
+                    }
                 }
                 else if (!nodesBefore.Any())
                 {
-                    elem.AppendNodes(Node);
-                    elem.AppendNodes(nodesAfter);
+                    if (isComposite)
+                    {
+                        elem.FirstChild.TextContent = Node.TextContent;
+                        elem.FirstChild.AppendNodes(nodesAfter);
+                    }
+                    else 
+                    {
+                        elem.AppendNodes(Node);
+                        elem.AppendNodes(nodesAfter);
+                    }
                 }
                 else
                 {
                     elem.AppendNodes(nodesBefore);
-                    elem.AppendNodes(containingElement);
-                    elem.AppendNodes(nodesAfter);
+                    if (isComposite)
+                    {
+                        elem.FirstChild.TextContent = containingElement.TextContent;
+                        elem.FirstChild.AppendNodes(nodesAfter);
+                    }
+                    else 
+                    {
+                        elem.AppendNodes(containingElement);
+                        elem.AppendNodes(nodesAfter);
+                    }
                 }
-                blockParentElement.ReplaceWith(elem);
+                ////From li to div (remove ul if no other li)
+                if (containingElement.NodeName == HTMLConstants.LiTag)
+                {
+                    if (blockParentElement.QuerySelectorAll(containingElement.NodeName).Count() > 1)
+                    {
+                        containingElement.ReplaceWith(elem);
+                    }
+                    else
+                    {
+                        nodes = FindBeforeAndAfterNodes(blockParentElement, containingElement);
+                        blockParentElement.ReplaceWith(nodes.nodesBefore.Concat(new[] { elem }).Concat(nodes.nodesAfter).ToArray());
+                    }
+                }
+                else
+                {
+                    //parent.Replace(elem);
+                    blockParentElement.ReplaceWith(elem);
+                }
             }
-        }
 
+        }
         /// <summary>
         /// Applies/Unapplies style to the elements in the given range.
         /// </summary>
@@ -180,34 +268,64 @@ namespace HtmlBuilder
         {
 
             IElement elem;
+            if (range == null)
+                throw new ArgumentNullException(nameof(range));
+            if (document == null)
+                throw new ArgumentNullException(nameof(document));
+
+            if (attributeValue == null)
+                attributeValue = () => "";
+
             void createStyleElement()
             {
                 elem = CreateElem(cmd, StyleAttribute, document, attributeValue);
             }
 
-            var isCmdForBlockElement = CommandIsBlockNodeCommand(cmd);
             if (cmd == EStyleCommand.FormatClear)
             {
-                var elementWithStyle = FindParentElementWithAStyleAttribute(Node) as IElement;
+                var elementWithStyle = NodeWalkFindParentElementWithAStyleAttribute(Node) as IElement;
                 if (elementWithStyle != null)
                 {
                     elementWithStyle.RemoveAttribute(HTMLConstants.Style);
                     if (elementWithStyle.NodeName == HTMLConstants.SpanTag)
                     {
-                        RemoveFromParentKeepContent(Node, HTMLConstants.SpanTag, document);
+                        var parentElement = NodeWalkGetParentOfElementNode(elementWithStyle) as IElement;
+                        parentElement.ReplaceChild(document.CreateTextNode(elementWithStyle.TextContent), elementWithStyle);
                     }
                 }
                 return;
             }
 
+            var isCmdForBlockElement = CommandIsBlockCommand(cmd);
+            var isCmdToggle = CommandIsToggleCommand(cmd);
+
             if (isCmdForBlockElement)
             {
-                var blockElement = FindBlockParent(Node) as IElement;
+                var blockElement = NodeWalkFindBlockParent(Node) as IElement;
                 if (blockElement != null)
                 {
                     var blockstyleAttr = blockElement.GetAttribute(HTMLConstants.Style);
-                    StyleAttribute = ReDefineStyle(blockstyleAttr, HTMLConstants.TextAlign, attributeValue());
-                    blockElement.SetAttribute(HTMLConstants.Style, StyleAttribute);
+                    switch (cmd) {
+                        case EStyleCommand.TextAlignCentre:
+                        case EStyleCommand.TextAlignJustify:
+                        case EStyleCommand.TextAlignLeft:
+                        case EStyleCommand.TextAlignRight:
+                            if (attributeValue == null)
+                                attributeValue = () => "";
+
+                            StyleAttribute = ReDefineStyle(blockstyleAttr, HTMLConstants.TextAlign, attributeValue());
+                            blockElement.SetAttribute(HTMLConstants.Style, StyleAttribute);
+                            break;
+                        case EStyleCommand.Increase:
+                            StyleAttribute = SetPaddingInCreaseDecrease(blockstyleAttr, true);
+                            blockElement.SetAttribute(HTMLConstants.Style, StyleAttribute);
+                            break;
+                        case EStyleCommand.Decrease:
+                            StyleAttribute = SetPaddingInCreaseDecrease(blockstyleAttr, false);
+                            blockElement.SetAttribute(HTMLConstants.Style, StyleAttribute);
+                            break;
+                    }
+
                 }
                 return;
             }
@@ -223,7 +341,7 @@ namespace HtmlBuilder
                 return;
             }
 
-            _styleattribute = GetParentElement(Node).GetAttribute(HTMLConstants.Style);
+            styleattribute = ((IElement)NodeWalkGetElement(Node)).GetAttribute(HTMLConstants.Style);
             if (RangeOutreachesTexNodeLength(range, nodeTextLength))
             {
                 ApplyElementStyle(cmd, this.Node, attributeValue, document);
@@ -242,14 +360,14 @@ namespace HtmlBuilder
             //rangeLength == 0 -> no selection only cursor. Then apply style to the word under the cursor
             if (rangeLength == 0)
             {
-                var startIndex = Math.Max(nodeText.LastIndexOf(" ", posStartWord), nodeText.LastIndexOf((char)160, posStartWord));
+                var startIndex = Math.Max(nodeText.LastIndexOf(" ", posStartWord, StringComparison.InvariantCulture), nodeText.LastIndexOf((char)160, posStartWord));
                 startIndex = startIndex == -1 ? 0 : startIndex;
 
-                var endIndex = Math.Max(nodeText.IndexOf(" ", posStartWord), nodeText.IndexOf((char)160, posStartWord));
+                var endIndex = Math.Max(nodeText.IndexOf(" ", posStartWord, StringComparison.InvariantCulture), nodeText.IndexOf((char)160, posStartWord));
                 endIndex = endIndex == -1 ? nodeTextLength : endIndex;
 
                 extractedTextRange = ExtractWord(startIndex, endIndex, nodeText);
-                if (extractedTextRange == "")
+                if (string.IsNullOrWhiteSpace(extractedTextRange))
                     return;
                 posStartWord = startIndex == 0 ? startIndex : startIndex  + 1; 
 
@@ -258,6 +376,27 @@ namespace HtmlBuilder
 
             if (ExtractedRangeEqualsTextRange(extractedTextRange, nodeText) || isCmdForBlockElement)
             {
+                if (isCmdToggle)
+                {
+                    //Apply Bold on Bold => implement as a Toggle => remove bold. Same accounts for emphasis.
+                    var ret = NodeWalkGetToggleElement(Node, cmd);
+                    if (ret.Success)
+                    {
+                        if (ret.Element.GetAttribute(HTMLConstants.Style) != null)
+                        {
+                            elem = document.CreateElement("span");
+                            elem.TextContent = Node.TextContent;
+                            CopyAttributes(ret.Element, elem);
+                            ret.Element.Replace(elem);
+                        }
+                        else
+                        {
+                            var parentElement = NodeWalkGetParentOfElementNode(ret.Element) as IElement;
+                            parentElement.ReplaceChild(ret.Element.FirstChild, ret.Element);
+                            return;
+                        }
+                    }
+                }
                 ApplyElementStyle(cmd, Node, attributeValue, document);
                 return;
             }
@@ -286,7 +425,7 @@ namespace HtmlBuilder
             var newElementname = GetElementName(cmd);
             if (newElementname != HTMLConstants.SpanTag)
             {
-                var alreadyPresent = ParentElementAlreadyExists(Node, newElementname.ToUpper());
+                var alreadyPresent = ParentElementAlreadyExists(newElementname.ToUpper(ciInvariant));
                 if (alreadyPresent != null && alreadyPresent.IndexOf(Node) != 0)
                 {
                     //redefine all
@@ -303,31 +442,12 @@ namespace HtmlBuilder
             Node.ReplaceWith(new[] { Node.Clone(), elem, restNode });
         }
 
-        internal INode FindBlockParent(INode node) 
+        private static IElement CreateListHolder(IDocument document, bool ordered) 
         {
-            var ret = InitWalk(node);
-            ret = NodeWalkBack(ret, Node, FindBlockElement);
-            if (ret.Success)
-            {
-                return ret.Node;
-            }
-            return GetParentOfElementThatContainsTheNodeWalk(node);
+            var elem = document.CreateElement(ordered ? HTMLConstants.OlTag.ToLower(ciInvariant) : HTMLConstants.UlTag.ToLower(ciInvariant));
+            return elem;
         }
-        internal INode GetParentOfElementThatContainsTheNodeWalk(INode node)
-        {
-            var ret = InitWalk(node);
-            ret = NodeWalkBack(ret, Node, GetElementNodeOfTheNode);
-            if (ret.Success)
-            {
-                ret = Then(ret, GetParentNode);
-                if (ret.Success)
-                {
-                    return ret.Node;
-                }
-            }
-            return node;
-        }
-        private void CopyAttributes(IElement from, IElement to)
+        private static void CopyAttributes(IElement from, IElement to)
         {
             foreach (var attrib in HTMLConstants.AttributesToCopy)
             {
@@ -339,13 +459,18 @@ namespace HtmlBuilder
             }
         }
 
-        private (INode[] nodesBefore, INode[] nodesAfter) FindBeforeAndAfterNodes(IElement parent, INode activeNode) 
+        private static (INode[] nodesBefore, INode[] nodesAfter) FindBeforeAndAfterNodes(IElement parent, INode activeNode) 
         {
             INode[] nodesBefore = Enumerable.Empty<INode>().ToArray();
             INode[] nodesAfter = Enumerable.Empty<INode>().ToArray();
             
+            if (parent == activeNode)
+                return (nodesBefore, nodesAfter);
+
             var nodeLength = parent.ChildNodes.Length;
             var nodeIndex = parent.IndexOf(activeNode);
+            if (nodeIndex == -1)
+                return (nodesBefore, parent.ChildNodes.ToArray());
 
             if (nodeIndex - 1 >= 0)
             {
@@ -359,9 +484,9 @@ namespace HtmlBuilder
 
         }
 
-        private bool GetElementNodeOfTheNode(INode textNode)
+        private bool FindElementNode(INode textNode)
         {
-            if (textNode.NodeName == HTMLConstants.bodyTag)
+            if (textNode.NodeName == HTMLConstants.BodyTag)
             {
                 return true;
             }
@@ -372,9 +497,9 @@ namespace HtmlBuilder
 
             return false;
         }
-        private (bool, INode) GetParentNode(INode node)
+        private static (bool Found, INode Node) TryGetParentNode(INode node)
         {
-            if (node.NodeName == HTMLConstants.bodyTag)
+            if (node.NodeName == HTMLConstants.BodyTag)
             {
                 return (true, node);
             }
@@ -388,18 +513,18 @@ namespace HtmlBuilder
 
         private bool FindBlockElement(INode node)
         {
-            if (node.NodeName == HTMLConstants.bodyTag)
+            if (node.NodeName == HTMLConstants.BodyTag)
             {
                 return true;
             }
-            if (node.NodeType == NodeType.Element && HTMLConstants.BlockElements.Any(n => n.Equals(node.NodeName.ToLower(), StringComparison.InvariantCulture)))
+            if (node.NodeType == NodeType.Element && HTMLConstants.BlockElements.Any(n => n.Equals(node.NodeName.ToLower(ciInvariant), StringComparison.InvariantCulture)))
             {
-                return true;
+;                return true;
             }
             return false;
         }
 
-        internal INode FindParentElementWithAStyleAttribute(INode node)
+        internal INode NodeWalkFindParentElementWithAStyleAttribute(INode node)
         {
             var ret = InitWalk(node);
             ret = NodeWalkBack(ret, Node, FindParentElementWithStyleAttribute);
@@ -411,7 +536,7 @@ namespace HtmlBuilder
         }
         private bool FindParentElementWithStyleAttribute(INode node)
         {
-            if (node.NodeName == HTMLConstants.bodyTag)
+            if (node.NodeName == HTMLConstants.BodyTag)
             {
                 return true;
             }
@@ -422,41 +547,57 @@ namespace HtmlBuilder
             }
             return false;
 
-            //var parentelem = GetParentElement(source);
-            //while (parentelem != null && parentelem.GetAttribute(HTMLConstants.Style) == null)
-            //{
-            //    parentelem = GetParentElement(parentelem);
-            //    if (parentelem.TagName == HTMLConstants.bodyTag)
-            //        return null;
-            //}
-
-            //if (parentelem == null )
-            //    return null;
-            //if (parentelem.GetAttribute(HTMLConstants.Style) == null)
-            //    return null;
-            //return parentelem;
         }
-        private bool CommandIsBlockNodeCommand(EStyleCommand cmd)
+        private static bool CommandIsBlockCommand(EStyleCommand cmd)
         {
             return cmd == EStyleCommand.TextAlignCentre
                 || cmd == EStyleCommand.TextAlignJustify
                 || cmd == EStyleCommand.TextAlignLeft
-                || cmd == EStyleCommand.TextAlignRight;
+                || cmd == EStyleCommand.TextAlignRight
+                || cmd == EStyleCommand.Decrease
+                || cmd == EStyleCommand.Increase
+                || cmd == EStyleCommand.BulletList
+                || cmd == EStyleCommand.NumberedList;
         }
-        private IElement GetParentElement(INode textNode)
+        private static bool CommandIsToggleCommand(EStyleCommand cmd)
         {
-            if (textNode.NodeName == HTMLConstants.bodyTag)
+            return cmd == EStyleCommand.Bold
+                || cmd == EStyleCommand.Emphasis
+                || cmd == EStyleCommand.BulletList
+                || cmd == EStyleCommand.NumberedList;
+        }
+        private static (bool Success, IElement Node) NodeIsToggleNode(INode node, EStyleCommand cmd)
+        {
+            if (cmd == EStyleCommand.Emphasis)
             {
-                return textNode as IElement;
+                if (node.NodeName == HTMLConstants.StrongTag)
+                {
+                    if (node.ParentElement.NodeName == HTMLConstants.EmTag)
+                    {
+                        return (true, node.ParentElement);
+                    }
+                }
+                if (node.NodeName == HTMLConstants.EmTag) 
+                {
+                    return (true, node as IElement);
+                }
             }
 
-            if (textNode.ParentElement == null && textNode is IElement)
-                return textNode as IElement;
-
-            if (textNode.ParentElement.NodeName == HTMLConstants.bodyTag)
-                return textNode.ParentElement;
-
-            return textNode.ParentElement;
+            if (cmd == EStyleCommand.Bold)
+            {
+                if (node.NodeName == HTMLConstants.StrongTag)
+                {
+                    if (node.ParentElement.NodeName == HTMLConstants.StrongTag)
+                    {
+                        return (true, node.ParentElement);
+                    }
+                }
+                if (node.NodeName == HTMLConstants.StrongTag)
+                {
+                    return (true, node as IElement);
+                }
+            }
+            return (false, node as IElement);
         }
         private bool RangeOutreachesTexNodeLength(MarkUpRange range, int length)
         {
@@ -469,139 +610,128 @@ namespace HtmlBuilder
             {
                 case EStyleCommand.Font:
                     StyleAttribute = ReDefineStyle(StyleAttribute, HTMLConstants.StyleFontFamily, attributeValue());
-                    GetParentElement(node).SetAttribute(HTMLConstants.Style, StyleAttribute);
+                    ((IElement)NodeWalkGetElement(node)).SetAttribute(HTMLConstants.Style, StyleAttribute);
                     break;
                 case EStyleCommand.Bold:
-                    parentElem = ParentElementAlreadyExists(node, HTMLConstants.SpanStrong);
+                    parentElem = ParentElementAlreadyExists(HTMLConstants.StrongTag);
                     if (parentElem != null)
                     {
-                        RemoveFromParentKeepContent(node, HTMLConstants.SpanStrong, document);
+                        RemoveFromParentKeepContent(node, document);
                     }
                     else
                     {
-                        var strong = document.CreateElement(HTMLConstants.SpanStrong);
-                        GetParentElement(node).ReplaceChild(strong, node);
+                        var strong = document.CreateElement(HTMLConstants.StrongTag);
+                        NodeWalkGetElement(node).ReplaceChild(strong, node);
                         strong.AppendChild(node);
                     }
                     break;
                 case EStyleCommand.Emphasis:
-                    parentElem = ParentElementAlreadyExists(node, HTMLConstants.SpanEm);
+                    parentElem = ParentElementAlreadyExists(HTMLConstants.EmTag);
                     if (parentElem != null)
                     {
-                        RemoveFromParentKeepContent(node, HTMLConstants.SpanEm, document);
+                        RemoveFromParentKeepContent(node, document);
                     }
                     else
                     {
-                        var em = document.CreateElement(HTMLConstants.SpanEm);
+                        var em = document.CreateElement(HTMLConstants.EmTag);
                         em.TextContent = node.TextContent;
                         node.TextContent = "";
-                        GetParentElement(node).ReplaceChild(em, node);
+                        NodeWalkGetElement(node).ReplaceChild(em, node);
                     }
                     break;
                 case EStyleCommand.Color:
                     StyleAttribute = ReDefineStyle(StyleAttribute, HTMLConstants.StyleColor, attributeValue());
-                    GetParentElement(node).SetAttribute(HTMLConstants.Style, StyleAttribute);
+                    ((IElement)NodeWalkGetElement(node)).SetAttribute(HTMLConstants.Style, StyleAttribute);
                     break;
                 case EStyleCommand.BackGroundColor:
                     StyleAttribute = ReDefineStyle(StyleAttribute, HTMLConstants.StyleBackColor, attributeValue());
-                    GetParentElement(node).SetAttribute(HTMLConstants.Style, StyleAttribute);
+                    ((IElement)NodeWalkGetElement(node)).SetAttribute(HTMLConstants.Style, StyleAttribute);
                     break;
                 case EStyleCommand.FormatClear:
-                    GetParentElement(node).SetAttribute(HTMLConstants.Style, "");
+                    ((IElement)NodeWalkGetElement(node)).SetAttribute(HTMLConstants.Style, "");
                     break;
-
             }
         }
-        private void RemoveFromParentKeepContent(INode node, string nodeNameToRemove, IDocument document)
+        private void RemoveFromParentKeepContent(INode node, IDocument document)
         {
-            var elementNode = GetParentOfElementThatContainsTheNodeWalk(Node) as IElement;
-            var nodes = FindBeforeAndAfterNodes(elementNode, Node.ParentElement );
+            (INode[] nodesBefore, INode[] nodesAfter) nodes;
+            var parentElement = NodeWalkGetParentOfElementNode(node) as IElement;
+
+            nodes = FindBeforeAndAfterNodes(parentElement, TryGetParentNode(Node).Node);
+
             var nodesAfter = nodes.nodesAfter;
             var nodesBefore = nodes.nodesBefore;
             var textNode = document.CreateTextNode(node.TextContent);
-            Node.ParentElement.Replace(nodesBefore.Concat(new[] { textNode }).Concat(nodesAfter).ToArray());
+            parentElement.Replace(nodesBefore.Concat(new[] { textNode }).Concat(nodesAfter).ToArray());
 
-            //var elementNode = GetParentElement(node);
-            //var hasNestedElements = false;
-            //while (elementNode.TextContent == GetParentElement(elementNode).TextContent && !(elementNode.NodeName == HTMLConstants.bodyTag))
-            //{
-            //    elementNode = GetParentElement(elementNode);
-            //    hasNestedElements = true;
-            //}
-            //if (hasNestedElements)
-            //{
-            //    var elemToRemoves = elementNode.DescendentsAndSelf().Where(n => n.NodeName == nodeNameToRemove);
-            //    if (elemToRemoves.Any())
-            //    {
-            //        foreach (var elemToRemove in elemToRemoves)
-            //        {
-            //            if (elemToRemove.ChildNodes.Any(m => m.NodeType == NodeType.Element))
-            //            {
-            //                elemToRemove.ReplaceWith(elemToRemove.ChildNodes.ToArray());
-            //            }
-            //            else
-            //            {
-            //                elemToRemove.RemoveFromParent();
-            //            }
-            //        }
-            //        elementNode.TextContent = node.TextContent;
-            //        return;
-            //    }
-            //}
-
-
-            //int iNodeOrdinal = 0;
-            //var parentElement = GetParentElement(elementNode);
-            //var childNodes = parentElement.ChildNodes;
-            //var iNodeLength = childNodes.Count();
-            //for (int i = 0; i < iNodeLength; i++)
-            //{
-            //    if (childNodes[i].Equals(elementNode))
-            //    {
-            //        break;
-            //    }
-            //    iNodeOrdinal++;
-
-            //}
-
-            //if (iNodeOrdinal == 0 && iNodeLength > 1)
-            //{
-            //    childNodes[iNodeOrdinal + 1].TextContent = node.TextContent + childNodes[iNodeOrdinal + 1].TextContent;
-            //}
-            //else
-            //{
-            //    childNodes[iNodeOrdinal - 1].TextContent += node.TextContent;
-            //}
-            //elementNode.RemoveFromParent();
         }
-        private INode ParentElementAlreadyExists(INode node, string nodeName)
+        private INode ParentElementAlreadyExists(string nodeName)
         {
-            var elementNode = GetParentOfElementThatContainsTheNodeWalk(Node) as IElement;
+            var elementNode = NodeWalkGetParentOfElementNode(Node) as IElement;
             if (elementNode.NodeName == nodeName)
                 return elementNode;
 
             return null;
 
-            //if (node.NodeName == HTMLConstants.bodyTag)
-            //    return node;
+        }
+        private static short ParsePixel(string prpval) 
+        {
+            if (string.IsNullOrWhiteSpace(prpval))
+                return 0;
 
-            //var elementNode = GetParentElement(Node);
-            //if (elementNode.NodeName == nodeName)
-            //    return elementNode;
+            int pos = prpval.IndexOf('p', StringComparison.InvariantCulture);
+            if (pos > 0)
+            {
+                return Convert.ToInt16(prpval.Substring(0, pos), ciInvariant);
+            }
+            return 0;
+        }
+        private static string SetPaddingInCreaseDecrease(string style, bool increase) 
+        {
+            const string padding = "padding-";
+            string suffix = "left";
+            string calculatePaddingValue(int nr) 
+            {
+                if (increase)
+                    return  $"{nr + 40}px";
 
+                if (nr >= 40)
+                {
+                    return $"{nr - 40}px";
+                }
+                return "0px";
+            }
+            if (style != null)
+            {
+                var ret = "";
+                var styleElements = StyleProperties(style).ToList();
 
-            //while (elementNode.TextContent == GetParentElement(elementNode).TextContent && elementNode.TagName != HTMLConstants.bodyTag)
-            //{
-            //    elementNode = GetParentElement(elementNode);
-            //}
-            //if (elementNode.NodeName == nodeName)
-            //{
-            //    return elementNode;
-            //}
-            //return null;
+                if (styleElements.Any(s => s.Prp == "text-align" && s.Val == "right"))
+                {
+                    suffix = "right";
+                }
+                StyleProperty paddingStyle = new StyleProperty() { Prp = $"{padding}{suffix}", Val = calculatePaddingValue(0) };
+                var current = styleElements.FirstOrDefault(s => s.Prp == $"{padding}{suffix}");
+                if (!string.IsNullOrWhiteSpace(current.Val))
+                {
+                    paddingStyle = new StyleProperty() { Prp = $"{padding}{suffix}", Val = calculatePaddingValue(ParsePixel(current.Val.Trim())) };
+                }
+                
+                var newStyleElements = styleElements.Except(styleElements.Where(s => s.Prp == $"{padding}{suffix}")).Concat(new[] { paddingStyle });
+                foreach (var elem in newStyleElements)
+                {
+                    ret += $"{elem.Prp}:{elem.Val}; ";
+                }
+                return ret.TrimEnd();
+            }
+            else
+            {
+                return $"{padding}{suffix}:{calculatePaddingValue(0)};";
+            }
+
         }
 
-        private string ReDefineStyle(string style, string styleAttribute, string newValue)
+        private static string ReDefineStyle(string style, string styleAttribute, string newValue)
         {
             if (style == null)
             {
@@ -643,7 +773,7 @@ namespace HtmlBuilder
             }
             return ret.Trim();
         }
-        private bool HasStyle(IEnumerable<StyleProperty> style, string styleAttribute, string newValue)
+        private static bool HasStyle(IEnumerable<StyleProperty> style, string styleAttribute, string newValue)
         {
             if (style == null || !style.Any())
             {
@@ -651,20 +781,20 @@ namespace HtmlBuilder
             }
             return style.Any(s => s.Prp.Equals(styleAttribute, StringComparison.InvariantCultureIgnoreCase) && s.Val.Equals(newValue, StringComparison.InvariantCultureIgnoreCase));
         }
-        private IEnumerable<StyleProperty> StyleProperties(string style)
+        private static IEnumerable<StyleProperty> StyleProperties(string style)
         {
             if (string.IsNullOrWhiteSpace(style))
                 return Enumerable.Empty<StyleProperty>();
 
             return from s in style.Split(';')
                    where s.Split(':').Length == 2
-                   select new StyleProperty() { Prp = s.Split(':')[0].Trim(), Val = s.Split(':')[1].Replace(";", null).Trim() };
+                   select new StyleProperty() { Prp = s.Split(':')[0].Trim(), Val = s.Split(':')[1].Replace(";", null, StringComparison.InvariantCulture).Trim() };
         }
-        private bool ExtractedRangeEqualsTextRange(string extractedWord, string textNode)
+        private static bool ExtractedRangeEqualsTextRange(string extractedWord, string textNode)
         {
             return extractedWord == textNode;
         }
-        private bool ExtractedRangeIsAtStartOfTextRange(int posStartWord)
+        private static bool ExtractedRangeIsAtStartOfTextRange(int posStartWord)
         {
             return posStartWord == 0;
         }
@@ -675,7 +805,7 @@ namespace HtmlBuilder
 
             return Node.TextContent.Substring(posStartWord + extractedText.Length).Trim().Length == 0;
         }
-        private string ExtractWord(int posStartWord, int posEndWord, string nodeText)
+        private static string ExtractWord(int posStartWord, int posEndWord, string nodeText)
         {
             if (posStartWord == posEndWord)
                 return "";
@@ -686,7 +816,7 @@ namespace HtmlBuilder
             return nodeText.Substring(posStartWord, posEndWord - posStartWord);
 
         }
-        private bool ContainsZeroCharachtersOrOnlyWhiteSpaces(int offset, int rangeLength, string nodeText)
+        private static bool ContainsZeroCharachtersOrOnlyWhiteSpaces(int offset, int rangeLength, string nodeText)
         {
             string spaceCharacter;
             if (offset == 0 && rangeLength == 0)
@@ -700,22 +830,22 @@ namespace HtmlBuilder
             {
                 spaceCharacter = nodeText.Substring(offset).Trim();
             }
-            return spaceCharacter == "";
+            return string.IsNullOrEmpty( spaceCharacter);
 
         }
-        private string GetElementName(EStyleCommand cmd)
+        private static string GetElementName(EStyleCommand cmd)
         {
             switch (cmd)
             {
                 case EStyleCommand.Bold:
-                    return HTMLConstants.SpanStrong;
+                    return HTMLConstants.StrongTag;
                 case EStyleCommand.Emphasis:
-                    return HTMLConstants.SpanEm;
+                    return HTMLConstants.EmTag;
                 default:
                     return HTMLConstants.SpanTag;
             }
         }
-        private IElement CreateElem(EStyleCommand cmd, string styleAttr, IDocument document, Func<string> attributeValue)
+        private static IElement CreateElem(EStyleCommand cmd, string styleAttr, IDocument document, Func<string> attributeValue)
         {
             IElement elem = null;
             var name = GetElementName(cmd);
@@ -742,12 +872,15 @@ namespace HtmlBuilder
         }
 
         #region nodeWalk
-        public Nodewalk InitWalk(INode node)
+        public static Nodewalk InitWalk(INode node)
         {
             return new Nodewalk() { Node = node, Success = true };
         }
         public Nodewalk NodeWalkBack(Nodewalk source, INode node, Func<INode, bool> func)
         {
+            if (func == null)
+                throw new InvalidOperationException(InvalidOperationErr);
+
             var result = func(node);
             while (!result && (node.PreviousSibling != null || node.ParentElement != null))
             {
@@ -761,6 +894,9 @@ namespace HtmlBuilder
         }
         public Nodewalk NodeWalk(Nodewalk source, INode node, Func<INode, bool> func)
         {
+            if (func == null)
+                throw new InvalidOperationException(InvalidOperationErr);
+
             var result = func(node);
             while (!result && (node.NextSibling != null || node.HasChildNodes))
             {
@@ -783,8 +919,11 @@ namespace HtmlBuilder
             }
             return new Nodewalk() { Success = result, Node = node };
         }
-        public Nodewalk Then(Nodewalk nodeWalk, Func<INode, (bool, INode)> func)
+        public static Nodewalk Then(Nodewalk nodeWalk, Func<INode, (bool, INode)> func)
         {
+            if (func == null)
+                throw new InvalidOperationException(InvalidOperationErr);
+
             if (nodeWalk.Success)
             {
                 var result = func(nodeWalk.Node);
@@ -794,6 +933,52 @@ namespace HtmlBuilder
                 }
             }
             return nodeWalk;
+        }
+        internal INode NodeWalkFindBlockParent(INode node)
+        {
+            var ret = InitWalk(node);
+            ret = NodeWalkBack(ret, Node, FindBlockElement);
+            if (ret.Success)
+            {
+                return ret.Node;
+            }
+            return NodeWalkGetParentOfElementNode(node);
+        }
+        internal INode NodeWalkGetParentOfElementNode(INode node)
+        {
+            var ret = InitWalk(node);
+            ret = NodeWalkBack(ret, node, FindElementNode);
+            if (ret.Success)
+            {
+                ret = Then(ret, TryGetParentNode);
+                if (ret.Success)
+                {
+                    return ret.Node;
+                }
+            }
+            return node;
+        }
+
+        internal (bool Success, IElement Element) NodeWalkGetToggleElement(INode node, EStyleCommand cmd) 
+        {
+            var ret = InitWalk(node);
+            ret = NodeWalkBack(ret, Node, FindElementNode);
+            if (ret.Success)
+            {
+                return NodeIsToggleNode(ret.Node, cmd);
+            }
+            return (false, node.ParentElement);
+
+        }
+        internal INode NodeWalkGetElement(INode node)
+        {
+            var ret = InitWalk(node);
+            ret = NodeWalkBack(ret, Node, FindElementNode);
+            if (ret.Success)
+            {
+                return ret.Node;
+            }
+            return node;
         }
         #endregion
     }

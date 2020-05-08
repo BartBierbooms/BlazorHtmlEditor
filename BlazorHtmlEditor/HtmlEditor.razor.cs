@@ -2,7 +2,9 @@
 using AngleSharp.Dom;
 using HtmlBuilder;
 using HtmlEditableContent;
+using MatBlazor;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using System;
 using System.Collections.Generic;
@@ -19,33 +21,110 @@ namespace BlazorHtmlEditor
 
         [Parameter]
         public BlockElement[] BlockStylings { get; set; }
+        
+        [Parameter] 
+        public EventCallback<string> OnSave { get; set; }
 
         [Parameter]
         public Color[] EditorColors { get; set; }
 
         [Parameter]
         public FontStyle[] FontStylings { get; set; }
-        public MarkUpRange Position { get; set; } = new MarkUpRange() { PositionEnd = -1, PositionStart = -1 };
+        public MarkUpRange Position { get; set; } = new MarkUpRange() { PositionEnd = 0, PositionStart = 0 };
 
-        private string _selector = "";
+        #region menu
+        private BaseMatButton FileMnuButton;
+        private BaseMatButton EditMnuButton;
+        private BaseMatButton ViewMnuButton;
+        private BaseMatMenu MnuFile;
+        private BaseMatMenu MnuEdit;
+        private BaseMatMenu MnuView;
+
+        private async void OnMnuItemSourceClick() 
+        {
+            var document = await htmlBuilder.GetDocument().ConfigureAwait(true);
+            source = document.Body.FirstElementChild.ToHtml(); 
+            sourceDialog = true;
+            await InvokeAsync(StateHasChanged).ConfigureAwait(true);
+        }
+        private async void OnMnuItemImageClick()
+        {
+            imageDialog = true;
+            await InvokeAsync(StateHasChanged).ConfigureAwait(true);
+        }
+        private async void OnMnuItemLinkClick()
+        {
+            hRefLinkDialog = true;
+            await InvokeAsync(StateHasChanged).ConfigureAwait(true);
+        }
+        private async void OnMnuItemNewClick()
+        {
+            htmlBuilder.Reset();
+            await InvokeAsync(StateHasChanged).ConfigureAwait(true);
+        }
+        private async void OnMnuItemSaveClick()
+        {
+            var document = await htmlBuilder.GetDocument().ConfigureAwait(true);
+            source = document.Body.FirstElementChild.ToHtml();
+            await OnSave.InvokeAsync(source).ConfigureAwait(true);
+        }
+        private void OnMnuItemMediaClick()
+        {
+            Console.WriteLine("Todo insert media");
+        }
+        private async void OnMnuItemExampleClick()
+        {
+            var document = await htmlBuilder.GetDocument().ConfigureAwait(true);
+            exampleHtml = (MarkupString)document.Body.FirstElementChild.ToHtml();
+            ExampleDialog = true;
+            await InvokeAsync(StateHasChanged).ConfigureAwait(true);
+        }
+        private void OnViewClick()
+        {
+            MnuView.OpenAsync(ViewMnuButton.Ref);
+        }
+
+        private void OnEditClick()
+        {
+            MnuEdit.OpenAsync(EditMnuButton.Ref);
+        }
+
+        private void OnFileClick()
+        {
+            MnuFile.OpenAsync(FileMnuButton.Ref);
+        }
+        #endregion
+
+        private string selector = "";
         private string Selector { get {
-                if (_selector.Length > 10)
-                    return $"path: { _selector.Substring(10)}";
+                if (selector.Length > 10)
+                    return $"path: { selector.Substring(10)}";
                 return "";
             }
-            set => _selector = value;
+            set => selector = value;
         }
-        private string Id { get; } = Guid.NewGuid().ToString().Replace("-", "");
-        private bool ShowColorGrid { get; set; } = false;
+        private string id { get; } = Guid.NewGuid().ToString().Replace("-", "", StringComparison.InvariantCulture);
+        private bool showColorGrid { get; set; } = false;
         private const string hardSpace = "\u200B";
-        private bool ShowBackGroundColorGrid { get; set; } = false;
-        private MarkupString html = (MarkupString)$@"<div>{HttpUtility.HtmlDecode(hardSpace)}</div>";
-        //private MarkupString html = (MarkupString)$@"<div>een koe <span style= ""font-family:Courier;"">heeft</span> hoorns​</div>";
-        private bool HRefLinkDialog { get; set; }
-        private bool DisableHRefLink { get; set; }
-        private bool RangeSelectionInRef { get; set; }
-        private HRef Link { get; set; } = new HRef();
+        private bool showBackGroundColorGrid { get; set; } = false;
 
+        //private MarkupString html = (MarkupString)$@"<style>html, body {{font-family: 'Courier';}}</style><div>{HttpUtility.HtmlDecode(hardSpace)}</div>";
+        private MarkupString html = (MarkupString)$@"<div>{HttpUtility.HtmlDecode(hardSpace)}</div>";
+        private string source { get; set; }
+        private MarkupString exampleHtml { get; set; }
+
+        private bool hRefLinkDialog { get; set; }
+        private bool imageDialog { get; set; }
+        private bool sourceDialog { get; set; }
+        private bool ExampleDialog { get; set; }
+        private bool disableHRefLink { get; set; }
+        private bool RangeSelectionInRef { get; set; }
+        private HRef link { get; set; } = new HRef();
+        private Image image { get; set; } = new Image();
+
+        /// <summary>
+        /// default colors. Provide your own using parameter
+        /// </summary>
         private Color[] Colors = new[]
         {
             Color.None,
@@ -69,6 +148,9 @@ namespace BlazorHtmlEditor
             new Color("Lime", 223, 125, 146),
         };
 
+        /// <summary>
+        /// Default paragraph block elements. Provide your own using parameter
+        /// </summary>
         private BlockElement[] BlockElements = new[]
             {
                 BlockElement.None,
@@ -77,7 +159,9 @@ namespace BlazorHtmlEditor
                 new BlockElement("Heading3", "H3"),
                 new BlockElement("Heading4", "H4"),
             };
-
+        /// <summary>
+        /// Default font styles. Provide your own using parameter
+        /// </summary>
         private FontStyle[] FontStyles = new[]
             {
                 FontStyle.None,
@@ -85,15 +169,15 @@ namespace BlazorHtmlEditor
                 new FontStyle("Arial", "Arial, Helvetica, sans-serif"),
                 new FontStyle("Courier", "Courier"),
             };
-        private List<string> ParagraphNames { get; set; }
-        private List<string> FontNames { get; set; }
-        private List<string> ColorNames { get; set; }
+        private List<string> paragraphNames { get; set; }
+        private List<string> fontNames { get; set; }
+        private List<string> colorNames { get; set; }
 
 
-        private BlockElement _activeBlockElement;
-        private FontStyle _activeFontStyle;
-        private Color _activeColor;
-        private Color _activeBackGroundColor;
+        private BlockElement activeBlockElement;
+        private FontStyle activeFontStyle;
+        private Color activeColor;
+        private Color activeBackGroundColor;
 
         private bool firstTimeActiveFontStyle = true;
         private bool firstTimeActiveBlockElement = true;
@@ -103,11 +187,11 @@ namespace BlazorHtmlEditor
         {
             get
             {
-                return _activeFontStyle;
+                return activeFontStyle;
             }
             set
             {
-                _activeFontStyle = value;
+                activeFontStyle = value;
                 if (!firstTimeActiveFontStyle)
                     HandleFontChange();
 
@@ -118,11 +202,11 @@ namespace BlazorHtmlEditor
         {
             get
             {
-                return _activeBackGroundColor;
+                return activeBackGroundColor;
             }
             set
             {
-                _activeBackGroundColor = value;
+                activeBackGroundColor = value;
 
                 if (!firstTimeActiveBackGroundColor)
                     HandleBackGroundColorChange();
@@ -131,17 +215,17 @@ namespace BlazorHtmlEditor
 
             }
         }
-        private string ActiveFontColor => $"color:{_activeColor.ToHtmlStyle()};";
-        private string ActiveBackGroundFontColor => $"background-color:{_activeBackGroundColor.ToHtmlStyle()};";
+        private string ActiveFontColor => $"color:{activeColor.ToHtmlStyle()};";
+        private string ActiveBackGroundFontColor => $"background-color:{activeBackGroundColor.ToHtmlStyle()};";
         private Color ActiveColor
         {
             get
             {
-                return _activeColor;
+                return activeColor;
             }
             set
             {
-                _activeColor = value;
+                activeColor = value;
                 if (!firstTimeActiveColor)
                     HandleColorChange();
 
@@ -152,11 +236,11 @@ namespace BlazorHtmlEditor
         {
             get
             {
-                return _activeBlockElement;
+                return activeBlockElement;
             }
             set
             {
-                _activeBlockElement = value;
+                activeBlockElement = value;
                 if (!firstTimeActiveBlockElement)
                     HandleBlockElementChange();
 
@@ -169,7 +253,7 @@ namespace BlazorHtmlEditor
             {
                 if (_htmlBuilder == null)
                 {
-                    _htmlBuilder = RazorInstances.ActiveBuilderInstance(new Guid(Id));
+                    _htmlBuilder = RazorInstances.ActiveBuilderInstance(new Guid(id));
                 }
                 return _htmlBuilder;
             }
@@ -178,15 +262,15 @@ namespace BlazorHtmlEditor
         public async Task PositionChanged(MarkUpRange range)
         {
             Position = range;
-            await SetCurrentStyles();
-            await InvokeAsync(StateHasChanged);
+            await SetCurrentStyles().ConfigureAwait(true);
+            await InvokeAsync(StateHasChanged).ConfigureAwait(true);
         }
 
         # endregion
         protected override async Task OnInitializedAsync()
         {
-            await base.OnInitializedAsync();
-            RazorInstances.EditorInstances.Add(new Guid(Id), this);
+            await base.OnInitializedAsync().ConfigureAwait(true);
+            RazorInstances.EditorInstances.Add(new Guid(id), this);
         }
         protected override Task OnParametersSetAsync()
         {
@@ -213,7 +297,7 @@ namespace BlazorHtmlEditor
             }
             if (EditorColors != null && FontStylings.Any())
             {
-                if (!EditorColors.Any(n => n.Name == ""))
+                if (!EditorColors.Any(n => string.IsNullOrEmpty(n.Name)))
                 {
                     Colors = (new[] { Color.None }).Concat(EditorColors).ToArray();
                 }
@@ -224,91 +308,87 @@ namespace BlazorHtmlEditor
             }
                 
             ActiveFontStyle = FontStyles.First();
-            FontNames = FontStyles.Skip(1).Select(f => f.TechName).ToList();
+            fontNames = FontStyles.Skip(1).Select(f => f.TechName).ToList();
 
             ActiveBlockElement = BlockElements.First();
-            ParagraphNames = BlockElements.Skip(1).Select(p => p.NodeName).ToList();
+            paragraphNames = BlockElements.Skip(1).Select(p => p.NodeName).ToList();
 
             ActiveColor = Colors.First();
             ActiveBackGroundColor = Colors.First();
-            ColorNames = Colors.Skip(1).Select(c => c.ToHtmlStyle()).ToList();
+            colorNames = Colors.Skip(1).Select(c => c.ToHtmlStyle()).ToList();
 
             return base.OnParametersSetAsync();
         }
-        protected override void OnAfterRender(bool firstRender)
-        {
-            base.OnAfterRender(firstRender);           
-        }
         private async Task SetActiveColorOfRange(IEnumerable<IEnumerable<StyleProperty>> rangeStylings)
         {
-            var currentcolor = _activeColor.Name;
+            var currentcolor = activeColor.Name;
             var colors = rangeStylings.SelectMany(styleprps => styleprps.Where(p => p.Prp == HTMLConstants.StyleColor)).Distinct();
             if (colors.Any() && colors.Count() == 1)
             {
                 var color = colors.First();
-                if (ColorNames.Any(n => n.Equals(color.Val, StringComparison.InvariantCulture)))
+                if (colorNames.Any(n => n.Equals(color.Val, StringComparison.InvariantCulture)))
                 {
-                    _activeColor = Colors.First(s => s.ToHtmlStyle() == color.Val);
-                    if (currentcolor != _activeColor.Name)
+                    activeColor = Colors.First(s => s.ToHtmlStyle() == color.Val);
+                    if (currentcolor != activeColor.Name)
                     {
-                        await InvokeAsync(StateHasChanged);
+                        await InvokeAsync(StateHasChanged).ConfigureAwait(true);
                     }
                     return;
                 }
             }
-            _activeColor = Color.None;
-            if (currentcolor != _activeColor.Name)
+            activeColor = Color.None;
+            if (currentcolor != activeColor.Name)
             {
-                await InvokeAsync(StateHasChanged);
+                await InvokeAsync(StateHasChanged).ConfigureAwait(true);
             }
             return;
         }
         private async Task SetActiveBackColorOfRange(IEnumerable<IEnumerable<StyleProperty>> rangeStylings)
         {
-            var currentcolor = _activeBackGroundColor.Name;
+            var currentcolor = activeBackGroundColor.Name;
             var colors = rangeStylings.SelectMany(styleprps => styleprps.Where(p => p.Prp == HTMLConstants.StyleBackColor)).Distinct();
             if (colors.Any() && colors.Count() == 1)
             {
                 var color = colors.First();
-                if (ColorNames.Any(n => n.Equals(color.Val, StringComparison.InvariantCulture)))
+                if (colorNames.Any(n => n.Equals(color.Val, StringComparison.InvariantCulture)))
                 {
-                    _activeBackGroundColor = Colors.First(s => s.ToHtmlStyle() == color.Val);
-                    if (currentcolor != _activeBackGroundColor.Name)
+                    activeBackGroundColor = Colors.First(s => s.ToHtmlStyle() == color.Val);
+                    if (currentcolor != activeBackGroundColor.Name)
                     {
-                        await InvokeAsync(StateHasChanged);
+                        await InvokeAsync(StateHasChanged).ConfigureAwait(true);
                     }
                     return;
                 }
             }
-            _activeBackGroundColor = Color.None;
-            if (currentcolor != _activeBackGroundColor.Name)
+            activeBackGroundColor = Color.None;
+            if (currentcolor != activeBackGroundColor.Name)
             {
-                await InvokeAsync(StateHasChanged);
+                await InvokeAsync(StateHasChanged).ConfigureAwait(true);
             }
 
         }
 
         private async Task SetActiveFontOfRange(IEnumerable<IEnumerable<StyleProperty>> rangeStylings)
         {
-            var currentfont = _activeFontStyle.Name;
+            var currentfont = activeFontStyle.Name;
             var fonts = rangeStylings.SelectMany(styleprps => styleprps.Where(p => p.Prp == HTMLConstants.StyleFontFamily)).Distinct();
             if (fonts.Any() && fonts.Count() == 1)
             {
                 var font = fonts.First();
-                if (FontNames.Any(n => n.Equals(font.Val, StringComparison.InvariantCulture)))
+                if (fontNames.Any(n => n.Equals(font.Val, StringComparison.InvariantCulture)))
                 {
-                    _activeFontStyle = FontStyles.First(s => s.TechName == font.Val);
-                    if (currentfont != _activeFontStyle.Name)
+                    activeFontStyle = FontStyles.First(s => s.TechName == font.Val);
+                    if (currentfont != activeFontStyle.Name)
                     {
-                        await InvokeAsync(StateHasChanged);
+                        await InvokeAsync(StateHasChanged).ConfigureAwait(true);
                     }
                     return;
                 }
             }
-            _activeFontStyle = FontStyle.None;
-            if (currentfont != _activeFontStyle.Name)
+            activeFontStyle = FontStyle.None;
+            if (currentfont != activeFontStyle.Name)
             {
-                await InvokeAsync(StateHasChanged);
+                await InvokeAsync(StateHasChanged).ConfigureAwait(true);
             }
         }
 
@@ -321,15 +401,15 @@ namespace BlazorHtmlEditor
                 if (RangeSelectionInRef)
                 {
                     var htmlAnchorTag = rangeNodes.First();
-                    Link.Link = htmlAnchorTag.Node.ParentElement.GetAttribute("href");
-                    Link.Description = htmlAnchorTag.Node.TextContent;
+                    link.Link = htmlAnchorTag.Node.ParentElement.GetAttribute("href");
+                    link.Description = htmlAnchorTag.Node.TextContent;
                 }
             }
             else
             {
                 RangeSelectionInRef = false;
             }
-            await Task.FromResult(0);
+            await Task.FromResult(0).ConfigureAwait(true);
         }
         private async Task SetCurrentStyles()
         {
@@ -337,9 +417,9 @@ namespace BlazorHtmlEditor
             if(htmlBuilder == null || htmlBuilder.Document == null)
                 return;
 
-            var document = await htmlBuilder.GetDocument();
+            var document = await htmlBuilder.GetDocument().ConfigureAwait(true);
             var bodyNodes = document.Body.GetDescendants();
-            DisableHRefLink = !Position.NoSelection;
+            disableHRefLink = !Position.NoSelection;
             Selector = "";
             var inRangeNodes = RangeNode.InRange(bodyNodes, Position);
 
@@ -361,16 +441,16 @@ namespace BlazorHtmlEditor
                 }
             }
 
-            await DetermineActiveRangeIsHRef(inRangeNodes);
+            await DetermineActiveRangeIsHRef(inRangeNodes).ConfigureAwait(true);
 
             var distinctParagraphs = inRangeNodes.Select(n => n.Node.ParentElement).Distinct().GroupBy(n => n.NodeName);
 
             var stylings = inRangeNodes.Select(n => n.Styling);
             if (stylings.Any())
             {
-                await SetActiveFontOfRange(stylings);
-                await SetActiveColorOfRange(stylings);
-                await SetActiveBackColorOfRange(stylings);
+                await SetActiveFontOfRange(stylings).ConfigureAwait(true);
+                await SetActiveColorOfRange(stylings).ConfigureAwait(true);
+                await SetActiveBackColorOfRange(stylings).ConfigureAwait(true);
             }
 
             if (distinctParagraphs.Any())
@@ -379,16 +459,16 @@ namespace BlazorHtmlEditor
                 if (distinctParagraphsCount == 1)
                 {
                     var rangeNodeName = distinctParagraphs.First().Select(s => s.NodeName).First();
-                    var activeNodeName = _activeBlockElement.NodeName ?? "";
+                    var activeNodeName = activeBlockElement.NodeName ?? "";
                     if (!activeNodeName.Equals(rangeNodeName, StringComparison.InvariantCultureIgnoreCase))
                     {
-                        if (!ParagraphNames.Any(p => p.Equals(rangeNodeName, StringComparison.InvariantCultureIgnoreCase)))
+                        if (!paragraphNames.Any(p => p.Equals(rangeNodeName, StringComparison.InvariantCultureIgnoreCase)))
                         {
-                            _activeBlockElement = BlockElements.First();
+                            activeBlockElement = BlockElements.First();
                         }
                         else
                         {
-                            _activeBlockElement = BlockElements.Skip(1).First(n => n.NodeName.Equals(rangeNodeName, StringComparison.InvariantCultureIgnoreCase));
+                            activeBlockElement = BlockElements.Skip(1).First(n => n.NodeName.Equals(rangeNodeName, StringComparison.InvariantCultureIgnoreCase));
                             StateHasChanged();
                         }
                     }
@@ -396,16 +476,16 @@ namespace BlazorHtmlEditor
                 else
                 {
 
-                    _activeBlockElement = BlockElements.First();
+                    activeBlockElement = BlockElements.First();
                     StateHasChanged();
                 }
             }
             else
             {
 
-                if (_activeBlockElement.NodeName != "")
+                if (!string.IsNullOrWhiteSpace( activeBlockElement.NodeName))
                 {
-                    _activeBlockElement = BlockElements.First();
+                    activeBlockElement = BlockElements.First();
                     StateHasChanged();
                 }
             }
@@ -422,12 +502,12 @@ namespace BlazorHtmlEditor
         }
         private void HandleBackGroundColorChange()
         {
-            ShowBackGroundColorGrid = false;
+            showBackGroundColorGrid = false;
             RenderStyle(EStyleCommand.BackGroundColor);
         }
         private void HandleColorChange()
         {
-            ShowColorGrid = false;
+            showColorGrid = false;
             RenderStyle(EStyleCommand.Color);
         }
 
@@ -435,16 +515,16 @@ namespace BlazorHtmlEditor
         {
             if (htmlBuilder != null) 
             {
-                string DeterminAttributeValue()
+                string DetermineAttributeValue()
                 {
                     switch (cmd)
                     {
                         case EStyleCommand.Font:
-                            return _activeFontStyle.TechName;
+                            return activeFontStyle.TechName;
                         case EStyleCommand.Color:
-                            return _activeColor.ToHtmlStyle();
+                            return activeColor.ToHtmlStyle();
                         case EStyleCommand.BackGroundColor:
-                            return _activeBackGroundColor.ToHtmlStyle();
+                            return activeBackGroundColor.ToHtmlStyle();
                         case EStyleCommand.TextAlignCentre:
                             return "center";
                         case EStyleCommand.TextAlignJustify:
@@ -453,11 +533,15 @@ namespace BlazorHtmlEditor
                             return "left";
                         case EStyleCommand.TextAlignRight:
                             return "right";
+                        case EStyleCommand.Decrease:
+                            return "40px";
+                        case EStyleCommand.Increase:
+                            return "40px";
                         default:
                             return "";
                     }
                 }
-                await htmlBuilder.RenderStyle(cmd, () => DeterminAttributeValue());
+                await htmlBuilder.RenderStyle(cmd, () => DetermineAttributeValue()).ConfigureAwait(true);
             }
 
         }
@@ -469,29 +553,61 @@ namespace BlazorHtmlEditor
         {
             RenderStyle(EStyleCommand.TextAlignLeft);
         }
-        private async Task RenderLink(bool cancelled)
+        private async Task RenderImage(bool cancelled) 
         {
-            HRefLinkDialog = false;
+            imageDialog = false;
             if (cancelled)
             {
-                Link = new HRef();
+                image = new Image();
+                return;
+            }
+
+            bool isImageNode(RangeNode rn) {
+                var sibling = rn.Node?.NextSibling?.NodeName == "IMG";
+                if (sibling) {
+                    return Position.PositionStart == Position.PositionEnd && Position.PositionStart == rn.Offset + rn.Node.TextContent.Length - 1;
+                }
+                return false;
+            }
+            var elem = htmlBuilder.Document.CreateElement("img");
+            elem.SetAttribute("src", image.Source);
+            elem.SetAttribute("alt", image.Description);
+            elem.SetAttribute("height", image.Height);
+            elem.SetAttribute("width", image.Width);
+            void updateImage(RangeNode rangeNode)
+            {
+                var imgElem = rangeNode.Node.ParentElement;
+                imgElem.SetAttribute("src", image.Source);
+                imgElem.SetAttribute("alt", image.Description);
+                imgElem.SetAttribute("heigth", image.Height);
+                imgElem.SetAttribute("width", image.Width);
+            }
+            await htmlBuilder.InsertOrUpdateElementAtCurrentPosition(elem, rn => isImageNode(rn), updateImage).ConfigureAwait(true);
+
+        }
+        private async Task RenderLink(bool cancelled)
+        {
+            hRefLinkDialog = false;
+            if (cancelled)
+            {
+                link = new HRef();
                 return;
             }
             var elem = htmlBuilder.Document.CreateElement("a");
-            elem.SetAttribute("href", Link.Link);
-            elem.TextContent = Link.Description;
-            if (!string.IsNullOrWhiteSpace(Link.Target)) 
+            elem.SetAttribute("href", link.Link);
+            elem.TextContent = link.Description;
+            if (!string.IsNullOrWhiteSpace(link.Target)) 
             {
-                elem.SetAttribute("target", Link.Target);
+                elem.SetAttribute("target", link.Target);
             }
             void updateLink(RangeNode rangeNode)
             {
                 var hRefElem = rangeNode.Node.ParentElement;
-                hRefElem.SetAttribute("href", Link.Link);
-                hRefElem.TextContent = Link.Description;
+                hRefElem.SetAttribute("href", link.Link);
+                hRefElem.TextContent = link.Description;
             }
 
-            await htmlBuilder.InsertOrUpdateElementAtCurrentPosition(elem, rn => rn.Node.ParentElement.NodeName == "A", updateLink);
+            await htmlBuilder.InsertOrUpdateElementAtCurrentPosition(elem, rn => rn.Node.ParentElement.NodeName == "A", updateLink).ConfigureAwait(true);
         }
 
         private void RenderTextAlignRight()
@@ -501,6 +617,24 @@ namespace BlazorHtmlEditor
         private void RenderTextAlignCenter()
         {
             RenderStyle(EStyleCommand.TextAlignCentre);
+        }
+        private async void RenderTextBulletList()
+        {
+            htmlBuilder.RenderBlockElement(HTMLConstants.OlTag);
+            await InvokeAsync(StateHasChanged).ConfigureAwait(true);
+        }
+        private async void RenderTextNumberedList()
+        {
+            htmlBuilder.RenderBlockElement(HTMLConstants.UlTag);
+            await InvokeAsync(StateHasChanged).ConfigureAwait(true);
+        }
+        private void RenderTextIncrease()
+        {
+            RenderStyle(EStyleCommand.Increase);
+        }
+        private void RenderTextDecrease()
+        {
+            RenderStyle(EStyleCommand.Decrease);
         }
         private void RenderTextAlignJustify()
         {
@@ -524,15 +658,12 @@ namespace BlazorHtmlEditor
         }
         private async void RenderBlockElement()
         {
-            if (htmlBuilder != null)
-            {
-                htmlBuilder.RenderBlockElement(_activeBlockElement.NodeName);
-            }
-            await InvokeAsync(StateHasChanged);           
+            htmlBuilder.RenderBlockElement(activeBlockElement.NodeName);
+            await InvokeAsync(StateHasChanged).ConfigureAwait(true);           
         }
         public void Dispose()
         {
-            RazorInstances.EditorInstances.Remove(new Guid(Id));
+            RazorInstances.EditorInstances.Remove(new Guid(id));
         }
 
     }

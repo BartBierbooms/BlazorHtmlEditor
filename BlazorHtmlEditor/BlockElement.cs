@@ -6,7 +6,7 @@ namespace BlazorHtmlEditor
 {
     public class BlockElement
     {
-        public static BlockElement None = new BlockElement("", null);
+        public static BlockElement None { get; } = new BlockElement("", null);
 
         public BlockElement(string name, string nodeName)
         {

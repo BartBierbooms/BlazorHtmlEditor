@@ -26,6 +26,10 @@ a, .btn-link {
     padding-right: 2px;
     padding-left: 0px;
 }
+.editor-menu {
+    box-sizing: border-box;
+    overflow-x: hidden;
+}
 .editor-toolbar {
     display: block;
     border-color: rgb(204,204,204);

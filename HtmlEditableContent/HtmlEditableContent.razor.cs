@@ -10,6 +10,8 @@ using HtmlBuilder;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.JSInterop;
+using System.Web;
+using AngleSharp.Css;
 
 namespace HtmlEditableContent
 {
@@ -24,7 +26,7 @@ namespace HtmlEditableContent
                 idGuid = new Guid(_id);
             } 
         }
-        public MarkUpRange Position { get; set; } = new MarkUpRange() { PositionEnd = -1, PositionStart = -1 };
+        public MarkUpRange Position { get; set; } = new MarkUpRange() { PositionEnd = 0, PositionStart = 0 };
 
         private string _id;
         private Guid idGuid;
@@ -37,7 +39,7 @@ namespace HtmlEditableContent
         private IDocument document = null;
         public IDocument Document { get => document; }
         
-        public async Task InsertOrUpdateElementAtCurrentPosition(IElement elem, Expression<Func<RangeNode, bool>> alreadyExists, Action<RangeNode> updateAction)
+        public async Task InsertOrUpdateElementAtCurrentPosition(IElement elem, Func<RangeNode, bool> alreadyExists, Action<RangeNode> updateAction)
         {
 
             var documentAndMarkUp = await GetDocumentAndRange();
@@ -55,7 +57,7 @@ namespace HtmlEditableContent
             else if (inRangeNodes.Any() && inRangeNodes.Count() == 1)
             {
                 var node = inRangeNodes.First();
-                if (alreadyExists.Compile()(node))
+                if (alreadyExists(node))
                 {
                     updateAction(node);
                 }
@@ -66,6 +68,12 @@ namespace HtmlEditableContent
                 DocumentToMarkUpString();
                 await InvokeAsync(StateHasChanged);
             }
+        }
+        public async void Reset() 
+        {
+             const string hardSpace = "\u200B";
+             Html = $@"<div>{HttpUtility.HtmlDecode(hardSpace)}</div>";
+             await InvokeAsync(StateHasChanged);
         }
         public async Task RenderStyle(EStyleCommand cmd, Func<string> determineAttributeValue) 
         {
@@ -137,11 +145,19 @@ namespace HtmlEditableContent
             {
                 var config = Configuration.Default;
                 var context = BrowsingContext.New(config);
+
+                //var config = Configuration.Default.WithDefaultLoader(new LoaderOptions { IsResourceLoadingEnabled = true }).WithCss();
+                //var context = BrowsingContext.New(config);
+                //var address = "http://www.example.com"; // any reason for dropping the protocol?
+                //var document = await context.OpenAsync(address);
+                //var sheet = document.QuerySelector<IHtmlLinkElement>("link[rel=stylesheet]")?.Sheet;
+
                 document = await context.OpenAsync(req => req.Content(Html));
+                //var sheet = await context.GetCssStyling().ParseStylesheetAsync(new AngleSharp.Io.DefaultResponse(), new StyleOptions(document), new System.Threading.CancellationToken());
                 await HtmlBuilderInterop.AddEventListener(JSRuntime, Id);
                 RazorInstances.BuilderInstances.Add(idGuid, this);
             }
-            var position = Position ?? new MarkUpRange() { PositionEnd = 0, PositionStart = 0 };
+            var position = new MarkUpRange() { PositionEnd = 0, PositionStart = 0 };
             await HtmlBuilderInterop.SetContent(JSRuntime, Id, $"<span>{Html}</span>", position.PositionStart == -1 ? 0 : position.PositionStart, position.PositionEnd == -1 ? 0 : position.PositionEnd);
         }
        

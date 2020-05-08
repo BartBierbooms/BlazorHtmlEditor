@@ -49,7 +49,7 @@ export class MarkUpElement {
     {
         const elem = document.getElementById(id);
         const editableElem = this.editableDivNode(elem);
-        const tag = 'div';
+        let tag = 'div';
         let inTheMiddle: boolean;
         if (editableElem) {
 
@@ -57,6 +57,10 @@ export class MarkUpElement {
 
             if (rangeNode) {
                 const activeNode = rangeNode[1]
+                if (activeNode.parentElement.nodeName === 'LI')
+                {
+                    tag = 'li'
+                }
                 inTheMiddle = true;
                 if (rangeNode[0].startOffset === activeNode.textContent.length) {
                     inTheMiddle = false;

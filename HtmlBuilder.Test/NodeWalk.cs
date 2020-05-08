@@ -29,7 +29,7 @@ namespace HtmlBuilder.Test
             MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 1, PositionStart = 1 };
             var ranges = RangeNode.InRange(nodes, selectionRange);
             var range = ranges.First();
-            var parent = range.GetParentOfElementThatContainsTheNodeWalk(range.Node);
+            var parent = range.NodeWalkGetParentOfElementNode(range.Node);
 
             Assert.AreEqual(parent.ToHtml(), expectedNodeHtml);
             await Task.FromResult(0);
@@ -43,7 +43,7 @@ namespace HtmlBuilder.Test
             MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 3, PositionStart = 3 };
             var ranges = RangeNode.InRange(nodes, selectionRange);
             var range = ranges.First();
-            var parent = range.GetParentOfElementThatContainsTheNodeWalk(range.Node);
+            var parent = range.NodeWalkGetParentOfElementNode(range.Node);
 
             Assert.AreEqual(parent.ToHtml(), expectedNodeHtml);
             await Task.FromResult(0);
@@ -57,7 +57,7 @@ namespace HtmlBuilder.Test
             MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 7, PositionStart = 7 };
             var ranges = RangeNode.InRange(nodes, selectionRange);
             var range = ranges.First();
-            var parent = range.GetParentOfElementThatContainsTheNodeWalk(range.Node);
+            var parent = range.NodeWalkGetParentOfElementNode(range.Node);
 
             Assert.AreEqual(parent.ToHtml(), expectedNodeHtml);
             await Task.FromResult(0);
@@ -71,7 +71,7 @@ namespace HtmlBuilder.Test
             MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 7, PositionStart = 7 };
             var ranges = RangeNode.InRange(nodes, selectionRange);
             var range = ranges.First();
-            var parent = range.GetParentOfElementThatContainsTheNodeWalk(range.Node);
+            var parent = range.NodeWalkGetParentOfElementNode(range.Node);
 
             Assert.AreEqual(parent.ToHtml(), expectedNodeHtml);
             await Task.FromResult(0);
@@ -118,7 +118,7 @@ namespace HtmlBuilder.Test
             var ranges = RangeNode.InRange(nodes, selectionRange);
             var range = ranges.First();
 
-            var parent = range.GetParentOfElementThatContainsTheNodeWalk(range.Node);
+            var parent = range.NodeWalkGetParentOfElementNode(range.Node);
 
             range.ApplyBlockCommand("h1", document);
 
@@ -135,7 +135,7 @@ namespace HtmlBuilder.Test
             var ranges = RangeNode.InRange(nodes, selectionRange);
             var range = ranges.First();
 
-            var parent = range.GetParentOfElementThatContainsTheNodeWalk(range.Node);
+            var parent = range.NodeWalkGetParentOfElementNode(range.Node);
 
             range.ApplyBlockCommand("h1", document);
 

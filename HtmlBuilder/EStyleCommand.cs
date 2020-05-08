@@ -5,6 +5,8 @@
         Font,
         Bold,
         Emphasis,
+        Increase,
+        Decrease,
         Color,
         BackGroundColor,
         FormatClear,
@@ -12,5 +14,7 @@
         TextAlignRight,
         TextAlignCentre,
         TextAlignJustify,
+        NumberedList,
+        BulletList
     }
 }

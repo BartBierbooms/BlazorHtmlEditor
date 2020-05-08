@@ -4,18 +4,22 @@ using System.Text;
 
 namespace HtmlBuilder
 {
-    public class HTMLConstants
+    public static class HTMLConstants
     {
         public const string StyleFontFamily = "font-family";
         public const string StyleColor = "color";
         public const string StyleBackColor = "background-color";
-        internal const string SpanTag = "SPAN";
-        internal const string bodyTag = "BODY";
-        internal const string SpanDiv = "DIV";
-        internal const string SpanStrong = "STRONG";
-        internal const string SpanEm = "EM";
-        internal const string Style = "style";
-        internal const string TextAlign = "text-align";
+        public const string SpanTag = "SPAN";
+        public const string BodyTag = "BODY";
+        public const string DivTag = "DIV";
+        public const string StrongTag = "STRONG";
+        public const string EmTag = "EM";
+        public const string OlTag = "OL";
+        public const string UlTag = "UL";
+        public const string LiTag = "LI";
+        public const string Style = "style";
+        public const string TextAlign = "text-align";
+        public const string PaddingLeft = "padding-left";
 
         internal static string[] AttributesToCopy = new[] { "class", "contextmenu", "dir", "id", "lang", "spellcheck", "style", "tabindex", "title", "translate" };
 

@@ -10,12 +10,13 @@ namespace HtmlEditableContent
 {
     public interface IHtmlBuilder
     {
+        void Reset();
         IDocument Document { get; }
         Task RenderStyle(EStyleCommand cmd, Func<string> determineAttributeValue);
         void RenderBlockElement(string nodeName);
         Task<IDocument> GetDocument();
         MarkUpRange Position { get; set; }
-        Task InsertOrUpdateElementAtCurrentPosition(IElement elem, Expression<Func<RangeNode, bool>> alreadyExists, Action<RangeNode> updateAction);
+        Task InsertOrUpdateElementAtCurrentPosition(IElement elem, Func<RangeNode, bool> alreadyExists, Action<RangeNode> updateAction);
     }
     public interface IHtmlEditor
     {

@@ -1,4 +1,10 @@
 ﻿<div style="width:100%;">
+
+    <div class=".editor-menu">
+        <MatButton Label="File" OnClick="@OnFileClick" @ref="FileMnuButton"></MatButton>
+        <MatButton Label="Insert" OnClick="@OnEditClick" @ref="EditMnuButton"></MatButton>
+        <MatButton Label="View" OnClick="@OnViewClick" @ref="ViewMnuButton"></MatButton>
+    </div>
     <div class="editor-toolbar">
         <MatSelectItem style="float:left;" Label="Paragraph" @bind-Value="@ActiveBlockElement" Items="@BlockElements" Context="context">
             <ItemTemplate>
@@ -12,7 +18,7 @@
         </MatSelectItem>
         <MatIconButton Title="Bold" OnClick="RenderBold" Class="editor-toolbar-button" Icon="@MatIconNames.Format_bold"></MatIconButton>
         <MatIconButton Title="Emphasis" OnClick="RenderEmphasis" Class="editor-toolbar-button" Icon="@MatIconNames.Format_italic"></MatIconButton>
-        @if (ShowColorGrid)
+        @if (showColorGrid)
         {
             <MatSelectItem Title="Color" style="float:left;" Label="Color" @bind-Value="@ActiveColor" Items="@Colors" Context="context">
                 <ItemTemplate>
@@ -25,10 +31,10 @@
             /*Todo make separate blazor component*/
             <button Title="Color" type="button" style="@ActiveFontColor" class="mdc-icon-button mdc-ripple-upgraded--unbounded mdc-ripple-upgraded dropdownbuttonbutton">
                 <i @onclick="RenderColor" class="material-icons" style="float:left;">format_color_text</i>
-                <i @onclick="@(() => ShowColorGrid = !ShowColorGrid)" class="material-icons" style="float:left;position: relative;top: 10px;width:20px;">arrow_drop_down</i>
+                <i @onclick="@(() => showColorGrid = !showColorGrid)" class="material-icons" style="float:left;position: relative;top: 10px;width:20px;">arrow_drop_down</i>
             </button>
         }
-        @if (ShowBackGroundColorGrid)
+        @if (showBackGroundColorGrid)
         {
             <MatSelectItem Title="background color" style="float:left;" Label="Color" @bind-Value="@ActiveBackGroundColor" Items="@Colors" Context="context">
                 <ItemTemplate>
@@ -42,7 +48,7 @@
             /*Todo make separate blazor component*/
             <button type="button" Title="Background color" style="@ActiveBackGroundFontColor" class="mdc-icon-button mdc-ripple-upgraded--unbounded mdc-ripple-upgraded dropdownbuttonbutton">
                 <i @onclick="RenderBackGroundColor" class="material-icons" style="float:left;">format_color_fill</i>
-                <i @onclick="@(() => ShowBackGroundColorGrid = !ShowBackGroundColorGrid)" class="material-icons" style="float:left;position: relative;top: 10px;width:20px;">arrow_drop_down</i>
+                <i @onclick="@(() => showBackGroundColorGrid = !showBackGroundColorGrid)" class="material-icons" style="float:left;position: relative;top: 10px;width:20px;">arrow_drop_down</i>
             </button>
         }
         <MatIconButton OnClick="RenderTextClearFormatting" Class="editor-toolbar-button" Title="Clear formatting" Icon="@MatIconNames.Format_clear"></MatIconButton>
@@ -50,25 +56,70 @@
         <MatIconButton OnClick="RenderTextAlignRight" Class="editor-toolbar-button" Title="Right align" Icon="@MatIconNames.Format_align_right"></MatIconButton>
         <MatIconButton OnClick="RenderTextAlignCenter" Class="editor-toolbar-button" Title="Centre align" Icon="@MatIconNames.Format_align_center"></MatIconButton>
         <MatIconButton OnClick="RenderTextAlignJustify" Class="editor-toolbar-button" Title="Justify align" Icon="@MatIconNames.Format_align_justify"></MatIconButton>
-        <MatIconButton Disabled="DisableHRefLink" OnClick="@(() => HRefLinkDialog = true)" Title="Hyperlink" Class="editor-toolbar-button" Icon="@MatIconNames.Link"></MatIconButton>
+        <MatIconButton OnClick="RenderTextBulletList" Class="editor-toolbar-button" Title="Bullet list" Icon="@MatIconNames.Format_list_bulleted"></MatIconButton>
+        <MatIconButton OnClick="RenderTextNumberedList" Class="editor-toolbar-button" Title="Numbered List" Icon="@MatIconNames.Format_list_numbered"></MatIconButton>
+        <MatIconButton OnClick="RenderTextIncrease" Class="editor-toolbar-button" Title="Increase indent" Icon="@MatIconNames.Format_indent_increase"></MatIconButton>
+        <MatIconButton OnClick="RenderTextDecrease" Class="editor-toolbar-button" Title="Decrease indent" Icon="@MatIconNames.Format_indent_decrease"></MatIconButton>
+        <MatIconButton Disabled="disableHRefLink" OnClick="@(() => hRefLinkDialog = true)" Title="Hyperlink" Class="editor-toolbar-button" Icon="@MatIconNames.Link"></MatIconButton>
     </div>
-    <HtmlEditableContent.HtmlBuilderEditableContentBase Html="@html.Value"  Id="@Id" ></HtmlEditableContent.HtmlBuilderEditableContentBase>
+    <HtmlEditableContent.HtmlBuilderEditableContentBase Html="@html.Value" Id="@id"></HtmlEditableContent.HtmlBuilderEditableContentBase>
     <div class="editor-edit-bottom"><div>pos: @Position.PositionStart / @Position.PositionEnd <span>path: @Selector</span></div></div>
 </div>
 
-<MatDialog @bind-IsOpen="@HRefLinkDialog">
+<MatDialog @bind-IsOpen="sourceDialog">
+    <MatDialogTitle align="center">Source <MatIcon @onclick="@(e => { sourceDialog = false; })" align="right" Icon="@MatIconNames.Close" /></MatDialogTitle>
+    <MatDialogContent>
+        <div>@source</div>
+    </MatDialogContent>
+</MatDialog>
+
+<MatDialog @bind-IsOpen="ExampleDialog">
+    <MatDialogTitle align="center">Example <MatIcon @onclick="@(e => { ExampleDialog = false; })" align="right" Icon="@MatIconNames.Close" /></MatDialogTitle>
+    <MatDialogContent>
+        <div>@exampleHtml</div>
+    </MatDialogContent>
+</MatDialog>
+
+<MatDialog @bind-IsOpen="@imageDialog">
+    <MatDialogTitle>Insert/Edit image</MatDialogTitle>
+    <MatDialogContent>
+        <p>Source</p>
+        <MatTextField Value="@image.Source" OnInput="@(evt=> {
+                                                           image.Source = evt.Value.ToString();
+                                                           image.IsValid();
+                                                       })"></MatTextField>
+        <p>Description</p>
+        <MatTextField Value="@image.Description" OnInput="@(evt=> { image.Description = evt.Value.ToString();
+                                                                image.IsValid();
+                                                            })"></MatTextField>
+        <p>Widht</p>
+        <MatTextField Value="@image.Width" OnInput="@(evt=> { image.Width = evt.Value.ToString();
+                                                          image.IsValid();
+                                                      })"></MatTextField>
+        <p>Height</p>
+        <MatTextField Value="@image.Height" OnInput="@(evt=> { image.Height = evt.Value.ToString();
+                                                           image.IsValid();
+                                                       })"></MatTextField>
+    </MatDialogContent>
+    <MatDialogActions>
+        <MatButton OnClick="@(() =>RenderImage(true))">Cancel</MatButton>
+        <MatButton Disabled="@(!image.IsValid())" OnClick="@(() => RenderImage(false))">OK</MatButton>
+    </MatDialogActions>
+</MatDialog>
+
+<MatDialog @bind-IsOpen="@hRefLinkDialog">
     <MatDialogTitle>Hyperlink</MatDialogTitle>
     <MatDialogContent>
         <p>Description</p>
-        <MatTextField Value="@Link.Description" OnInput="@(evt=> {
-                                                               Link.Description = evt.Value.ToString();
-                                                               Link.IsValid();
+        <MatTextField Value="@link.Description" OnInput="@(evt=> {
+                                                               link.Description = evt.Value.ToString();
+                                                               link.IsValid();
                                                            })"></MatTextField>
         <p>Url</p>
-        <MatTextField Value="@Link.Link" OnInput="@(evt=> { Link.Link = evt.Value.ToString();
-                                                            Link.IsValid();
-                                                           })"></MatTextField>
-        <MatSelect Label="Target" @bind-Value="Link.Target">
+        <MatTextField Value="@link.Link" OnInput="@(evt=> { link.Link = evt.Value.ToString();
+                                                        link.IsValid();
+                                                    })"></MatTextField>
+        <MatSelect Label="Target" @bind-Value="link.Target">
             <MatOptionString></MatOptionString>
             <MatOptionString Value="_blank">Blank</MatOptionString>
             <MatOptionString Value="_self">Self</MatOptionString>
@@ -78,6 +129,26 @@
     </MatDialogContent>
     <MatDialogActions>
         <MatButton OnClick="@(() =>RenderLink(true))">Cancel</MatButton>
-        <MatButton Disabled="@(!Link.IsValid())" OnClick="@(() => RenderLink(false))">OK</MatButton>
+        <MatButton Disabled="@(!link.IsValid())" OnClick="@(() => RenderLink(false))">OK</MatButton>
     </MatDialogActions>
 </MatDialog>
+<MatMenu @ref="MnuFile">
+    <MatList>
+        <MatListItem @onclick="OnMnuItemNewClick">New</MatListItem>
+        <MatListItem @onclick="OnMnuItemSaveClick">Save</MatListItem>
+    </MatList>
+</MatMenu>
+<MatMenu @ref="MnuEdit">
+    <MatList>
+        <MatListItem @onclick="OnMnuItemImageClick">Image</MatListItem>
+        <MatListItem @onclick="OnMnuItemLinkClick">Link</MatListItem>
+        <MatListItem @onclick="OnMnuItemMediaClick">Media</MatListItem>
+    </MatList>
+</MatMenu>
+<MatMenu @ref="MnuView">
+    <MatList>
+        <MatListItem @onclick="OnMnuItemSourceClick">Source</MatListItem>
+        <MatListItem @onclick="OnMnuItemExampleClick">Example</MatListItem>
+    </MatList>
+</MatMenu>
+

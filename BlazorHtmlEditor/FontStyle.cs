@@ -2,7 +2,7 @@
 {
     public class FontStyle 
     {
-        public static FontStyle None = new FontStyle("", null);
+        public static FontStyle None { get; } = new FontStyle("", null);
         public FontStyle(string name, string techName)
         {
             this.Name = name;

@@ -9,11 +9,6 @@ namespace HtmlBuilder.Test
 {
     public class BlockElementRange
     {
-        [SetUp]
-        public void Setup()
-        {
-
-        }
 
         [Test]
         public async Task HtmlWithRangeWithinDiv_SetToHeading1_HtmlIsRenderedAsHeading1()
