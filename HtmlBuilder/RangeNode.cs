@@ -1,4 +1,5 @@
 ﻿using AngleSharp.Dom;
+using AngleSharp.Html.Dom;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,13 +8,21 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("HtmlBuilder.Test")]
 namespace HtmlBuilder
 {
+    /// <summary>
+    /// Class that combines a Textnode and its position with a Html documenet.
+    /// </summary>
     public class RangeNode
     {
         private const string InvalidOperationErr = "No continuation function defined.";
+        
         internal static Func<string> ApplyAttributeValueNone = () => "";
         public INode Node { get; private set; }
         public int Offset { get; private set; }
         private string styleattribute = null;
+
+        /// <summary>
+        /// Get the value of the style attribute of a Html element
+        /// </summary>
         public string StyleAttribute
         {
             get
@@ -31,17 +40,27 @@ namespace HtmlBuilder
                 styleattribute = value;
             }
         }
+        /// <summary>
+        /// Get attributes of a Html elment as key/value pairs
+        /// </summary>
         public IEnumerable<StyleProperty> Styling => StyleProperties(StyleAttribute);
-        private static readonly System.Globalization.CultureInfo ciInvariant = System.Globalization.CultureInfo.InvariantCulture;
         public RangeNode(INode node, int offSet)
         {
             Node = node;
             Offset = offSet;
         }
+
+        /// <summary>
+        /// Gets the Textnodes and their positions within a given range
+        /// </summary>
+        /// <param name="bodyNodes">The collection of nodes that is the source(usage: the childnodes of the body of a Html document)</param>
+        /// <param name="range">The range in the source to extract the intersected rangenodes from.</param>
+        /// <returns></returns>
         public static IEnumerable<RangeNode> InRange(IEnumerable<INode> bodyNodes, MarkUpRange range)
         {
             if (range == null)
                 throw new ArgumentNullException(nameof(range));
+
             if(bodyNodes == null)
                 throw new ArgumentNullException(nameof(bodyNodes));
 
@@ -116,10 +135,16 @@ namespace HtmlBuilder
                 }
                 else
                 {
-                    Node.TextContent = nodeText.Substring(0, nodeOffset);
-                    var restNode = Node.Clone();
-                    restNode.TextContent = nodeText.Substring(nodeOffset);
-                    return new[] { Node.Clone(), elem, restNode };
+                    if (nodeOffset > -1)
+                    {
+                        Node.TextContent = nodeText.Substring(0, nodeOffset);
+                        var restNode = Node.Clone();
+                        restNode.TextContent = nodeText.Substring(nodeOffset);
+                        return new[] { Node.Clone(), elem, restNode };
+                    }
+                    else {
+                        return new[] { Node.Clone(), elem};
+                    }
                 }
             }
             var insertNodes = CreateNewNodes();
@@ -135,7 +160,10 @@ namespace HtmlBuilder
         /// </example> 
         /// Turns a div element into a H1 element and a H1 element back to a div element.
         /// </summary>
-        /// <param name="blockCommand">Command for single element (Elements without mandatory attributes (anchor element has href attribute. Use InsertElementAtCurrentPosition for compound block elements))</param>
+        /// <param name="blockCommand">Command for single element (Elements without mandatory attributes (anchor element has href attribute).
+        /// Use InsertElementAtCurrentPosition for compound block elements))
+        /// Use this command for li elements.
+        /// </param>
         /// <param name="document">HTMLdocument</param>
         public void ApplyBlockCommand(string blockCommand, IDocument document)
         {
@@ -171,7 +199,335 @@ namespace HtmlBuilder
             ParentInsertNewElement(blockParentElement, createNewElem);
 
         }
+        /// <summary>
+        /// Applies/Unapplies style to the elements in the given range.
+        /// </summary>
+        /// <param name="range">Range</param>
+        /// <param name="cmd">A style command</param>
+        /// <param name="document"></param>
+        /// <param name="attributeValue">The attribute value, that fits the style command</param>
+        public void ApplyStyleCommand(MarkUpRange range, EStyleCommand cmd, IDocument document, Func<string> attributeValue)
+        {
 
+            if (range == null)
+                throw new ArgumentNullException(nameof(range));
+            if (document == null)
+                throw new ArgumentNullException(nameof(document));
+
+            if (attributeValue == null)
+                attributeValue = () => "";
+
+            if (cmd == EStyleCommand.FormatClear)
+            {
+                RemoveStyleAttribute(document);
+                return;
+            }
+
+            var isCmdForBlockElement = CommandIsBlockCommand(cmd);
+            if (isCmdForBlockElement)
+            {
+                SetStyleOnBlockElement(cmd, attributeValue);
+                return;
+            }
+
+            SetStyleOnInlineElement(range, cmd, document, attributeValue);
+        }
+
+        /// <summary>
+        /// Removes the style attribute from the Parentelement of the node.
+        /// </summary>
+        /// <param name="">IDocument</param>
+        public void RemoveStyleAttribute(IDocument document) 
+        {
+            if (document == null)
+                throw new ArgumentNullException(nameof(document));
+
+            var elementWithStyle = NodeWalkFindParentElementWithAStyleAttribute(Node) as IElement;
+            if (elementWithStyle != null)
+            {
+                elementWithStyle.RemoveAttribute(HTMLConstants.Style);
+                if (elementWithStyle.NodeName == HTMLConstants.SpanTag)
+                {
+                    var parentElement = NodeWalkGetParentOfElementNode(elementWithStyle) as IElement;
+                    parentElement.ReplaceChild(document.CreateTextNode(elementWithStyle.TextContent), elementWithStyle);
+                }
+            }
+        }
+
+        /// <summary>
+        /// The TextAlign commands, InCrease/Decrease, and List (Bullet and Numbered) are block command (versus inline command such as font). 
+        /// They apply to a paragraph element rather than a singe parentelement
+        /// Nodewalk from the current Node to the block parent element and apply the given style.
+        /// </summary>
+        /// <param name="cmd">A style command</param>
+        /// <param name="attributeValue">The attribute value, that fits the style command</param>
+        public void SetStyleOnBlockElement(EStyleCommand cmd, Func<string> attributeValue) 
+        {
+            var isCmdForBlockElement = CommandIsBlockCommand(cmd);
+
+            if (!isCmdForBlockElement)
+                throw new InvalidOperationException($"{nameof(cmd)} Comamnd cannot be used as block command");
+
+            var blockElement = NodeWalkFindBlockParent(Node) as IElement;
+            if (blockElement != null)
+            {
+                var blockstyleAttr = blockElement.GetAttribute(HTMLConstants.Style);
+                switch (cmd)
+                {
+                    case EStyleCommand.TextAlignCentre:
+                    case EStyleCommand.TextAlignJustify:
+                    case EStyleCommand.TextAlignLeft:
+                    case EStyleCommand.TextAlignRight:
+                        if (attributeValue == null)
+                            attributeValue = () => "";
+
+                        StyleAttribute = ReDefineElementStyle(blockstyleAttr, HTMLConstants.TextAlign, attributeValue());
+                        blockElement.SetAttribute(HTMLConstants.Style, StyleAttribute);
+                        break;
+                    case EStyleCommand.Increase:
+                        StyleAttribute = SetPaddingInCreaseDecrease(blockstyleAttr, true);
+                        blockElement.SetAttribute(HTMLConstants.Style, StyleAttribute);
+                        break;
+                    case EStyleCommand.Decrease:
+                        StyleAttribute = SetPaddingInCreaseDecrease(blockstyleAttr, false);
+                        blockElement.SetAttribute(HTMLConstants.Style, StyleAttribute);
+                        break;
+                }
+
+            }
+        }
+
+
+        public void SetStyleOnInlineElement(MarkUpRange range, EStyleCommand cmd, IDocument document, Func<string> attributeValue) 
+        {
+            if (range == null)
+                throw new ArgumentNullException(nameof(range));
+            if (document == null)
+                throw new ArgumentNullException(nameof(document));
+
+            if (attributeValue == null)
+                attributeValue = () => "";
+
+            int rangeLength = (range.PositionEnd - range.PositionStart);
+            int posEndWord = range.PositionEnd - Offset;
+            int posStartWord = range.PositionStart > Offset ? range.PositionStart - Offset : 0;
+            string nodeText = Node.TextContent;
+            int nodeTextLength = Node.TextContent.Length;
+            IElement newElement = null;
+
+            var isCmdToggle = CommandIsToggleCommand(cmd);
+            var isCmdForBlockElement = CommandIsBlockCommand(cmd);
+
+
+            void createStyleElement()
+            {
+                newElement = CreateElem(cmd, StyleAttribute, document, attributeValue);
+            }
+            
+            if (nodeText.Trim().Length == 0)
+            {
+                return;
+            }
+            var element = NodeWalkGetElement(this.Node) as IElement;
+            if (element == null)
+            {
+                throw new InvalidOperationException("Needs an element node to apply a style on");
+            }
+
+            if (RangeOutreachesTexNodeLength(range, nodeTextLength))
+            {
+                ApplyElementStyle(cmd, element, attributeValue, document);
+                return;
+            }
+
+            if (ContainsZeroCharachtersOrOnlyWhiteSpaces(posStartWord, posEndWord, nodeText))
+                return;
+
+            var poslength = posEndWord - posStartWord;
+            if (poslength == 0)
+                poslength = 1;
+
+            string extractedTextRange = nodeText.Substring(posStartWord, poslength);
+
+            //rangeLength == 0 -> no selection only cursor. Then apply style to the word under the cursor
+            if (rangeLength == 0)
+            {
+                var startIndex = Math.Max(nodeText.LastIndexOf(" ", posStartWord, StringComparison.InvariantCulture), nodeText.LastIndexOf((char)160, posStartWord));
+                startIndex = startIndex == -1 ? 0 : startIndex;
+
+                var endIndex = Math.Max(nodeText.IndexOf(" ", posStartWord, StringComparison.InvariantCulture), nodeText.IndexOf((char)160, posStartWord));
+                endIndex = endIndex == -1 ? nodeTextLength : endIndex;
+
+                extractedTextRange = ExtractWord(startIndex, endIndex, nodeText);
+                if (string.IsNullOrWhiteSpace(extractedTextRange))
+                    return;
+                posStartWord = startIndex == 0 ? startIndex : startIndex + 1;
+
+            }
+            posEndWord = extractedTextRange.Length;
+
+            if (ExtractedRangeEqualsTextRange(extractedTextRange, nodeText) || isCmdForBlockElement)
+            {
+                if (isCmdToggle)
+                {
+                    var adjacentElements = NodeWalkFindAdjacentElements(element, new List<string>(new[] { HTMLConstants.EmTag, HTMLConstants.StrongTag }));
+                    //Apply Bold on Bold => implement as a Toggle => remove bold. Same accounts for emphasis.
+                    var applyToggle = ApplyToggle(adjacentElements, cmd);
+
+                    if (applyToggle)
+                    {
+                        INode[] nodesBefore = Enumerable.Empty<INode>().ToArray();
+                        INode[] nodesAfter = Enumerable.Empty<INode>().ToArray();
+
+                        var adjacentElement = adjacentElements.First();
+                        
+                        var parentElementOfAdjacentBlock = adjacentElement.ParentElement;
+                        
+                        var nodeIndex = parentElementOfAdjacentBlock.IndexOf(adjacentElement);
+                        nodesBefore = parentElementOfAdjacentBlock.ChildNodes.Take(nodeIndex).ToArray();
+                        nodesAfter = parentElementOfAdjacentBlock.ChildNodes.Skip(nodeIndex + 1).ToArray();
+
+                        if (adjacentElements.Count == 1)
+                        {
+                            element.ReplaceWith(document.CreateTextNode(element.TextContent));
+                        }
+                        else 
+                        {
+                            var elementIndex = adjacentElements.IndexOf(element);
+                            if (elementIndex > 0 )
+                            {
+                                adjacentElements[elementIndex - 1].RemoveChild(element);
+                                adjacentElements[elementIndex].TextContent = nodeText;
+                                parentElementOfAdjacentBlock.ReplaceChild(adjacentElements[elementIndex].Clone(), adjacentElement);
+                            }
+                            else
+                            {
+                                adjacentElement.RemoveChild(element);
+                                adjacentElement.TextContent = nodeText;
+                            }
+                        }
+                        return;
+                    }
+                }
+                ApplyElementStyle(cmd, element, attributeValue, document);
+                return;
+            }
+
+            if (ExtractedRangeIsAtStartOfTextRange(posStartWord))
+            {
+                createStyleElement();
+                newElement.TextContent = nodeText.Substring(0, posEndWord);
+
+                ((ICharacterData)Node).Data = nodeText.Substring(posEndWord);
+                Node.InsertBefore(new[] { newElement });
+                return;
+            }
+
+
+            if (ExtractedRangeIsAtEndOfTextRange(posStartWord, posEndWord, extractedTextRange))
+            {
+                createStyleElement();
+                newElement.TextContent = nodeText.Substring(posStartWord);
+                Node.TextContent = nodeText.Substring(0, posStartWord);
+                Node.InsertAfter(new[] { newElement });
+                return;
+            }
+
+            //range is in the middle of the textnode
+            var newElementname = GetElementName(cmd);
+            if (newElementname != HTMLConstants.SpanTag)
+            {
+                var alreadyPresent = ParentElementAlreadyExists(newElementname.ToUpper(ciInvariant));
+                if (alreadyPresent != null && alreadyPresent.IndexOf(Node) != 0)
+                {
+                    //redefine all
+                    ApplyElementStyle(cmd, element, attributeValue, document);
+                    return;
+                }
+            }
+            createStyleElement();
+            newElement.TextContent = nodeText.Substring(posStartWord, posEndWord);
+
+            Node.TextContent = nodeText.Substring(0, posStartWord);
+            var restNode = Node.Clone();
+            restNode.TextContent = nodeText.Substring(posStartWord + posEndWord);
+            Node.ReplaceWith(new[] { Node.Clone(), newElement, restNode });
+
+        }
+        public void ApplyElementStyle(EStyleCommand cmd, IElement element, Func<string> attributeValue, IDocument document)
+        {
+            if (element == null)
+                throw new ArgumentNullException(nameof(element));
+            if (document == null)
+                throw new ArgumentNullException(nameof(document));
+
+            if (attributeValue == null)
+                attributeValue = () => "";
+
+            IElement parentElem = null;
+            switch (cmd)
+            {
+                case EStyleCommand.Font:
+                    StyleAttribute = ReDefineElementStyle(StyleAttribute, HTMLConstants.StyleFontFamily, attributeValue());
+                    element.SetAttribute(HTMLConstants.Style, StyleAttribute);
+                    break;
+                case EStyleCommand.Bold:
+                    parentElem = ParentElementAlreadyExists(HTMLConstants.StrongTag);
+                    if (parentElem != null)
+                    {
+                        RemoveFromParentKeepContent(element, document);
+                    }
+                    else
+                    {
+                        var strong = document.CreateElement(HTMLConstants.StrongTag);
+                        strong.TextContent = element.TextContent;
+                        if (element.NodeName == HTMLConstants.EmTag)
+                        {
+                            element.TextContent = "";
+                            element.AppendChild(strong);
+                        }
+                        else
+                        {
+                            element.ParentElement.ReplaceChild(strong, element);
+                        }
+                    }
+                    break;
+                case EStyleCommand.Emphasis:
+                    parentElem = ParentElementAlreadyExists(HTMLConstants.EmTag);
+                    if (parentElem != null)
+                    {
+                        RemoveFromParentKeepContent(element, document);
+                    }
+                    else
+                    {
+                        var em = document.CreateElement(HTMLConstants.EmTag);
+                        em.TextContent = element.TextContent;
+                        if (element.NodeName == HTMLConstants.StrongTag)
+                        {
+                            element.TextContent = "";
+                            element.AppendChild(em);
+                        }
+                        else
+                        {
+                            element.ParentElement.ReplaceChild(em, element);
+                        }
+                    }
+                    break;
+                case EStyleCommand.Color:
+                    StyleAttribute = ReDefineElementStyle(StyleAttribute, HTMLConstants.StyleColor, attributeValue());
+                    element.SetAttribute(HTMLConstants.Style, StyleAttribute);
+                    break;
+                case EStyleCommand.BackGroundColor:
+                    StyleAttribute = ReDefineElementStyle(StyleAttribute, HTMLConstants.StyleBackColor, attributeValue());
+                    element.SetAttribute(HTMLConstants.Style, StyleAttribute);
+                    break;
+                case EStyleCommand.FormatClear:
+                    element.SetAttribute(HTMLConstants.Style, "");
+                    break;
+            }
+        }
+
+        private static readonly System.Globalization.CultureInfo ciInvariant = System.Globalization.CultureInfo.InvariantCulture;
         private void ParentInsertNewElement(IElement blockParentElement, Func<IElement> createElement)
         {
             var walkFindElementOfNode = InitWalk(Node);
@@ -197,14 +553,14 @@ namespace HtmlBuilder
                 var isComposite = elem.FirstChild != null;
 
                 CopyAttributes(walkFindElementOfNode.Node as IElement, elem);
-                
+
                 if (!nodesBefore.Any() && !nodesAfter.Any())
                 {
                     if (isComposite)
                     {
                         elem.FirstChild.TextContent = Node.TextContent;
                     }
-                    else 
+                    else
                     {
                         elem.AppendNodes(containingElement.ChildNodes.ToArray());
                     }
@@ -216,7 +572,7 @@ namespace HtmlBuilder
                         elem.FirstChild.TextContent = Node.TextContent;
                         elem.FirstChild.AppendNodes(nodesAfter);
                     }
-                    else 
+                    else
                     {
                         elem.AppendNodes(Node);
                         elem.AppendNodes(nodesAfter);
@@ -230,7 +586,7 @@ namespace HtmlBuilder
                         elem.FirstChild.TextContent = containingElement.TextContent;
                         elem.FirstChild.AppendNodes(nodesAfter);
                     }
-                    else 
+                    else
                     {
                         elem.AppendNodes(containingElement);
                         elem.AppendNodes(nodesAfter);
@@ -256,190 +612,6 @@ namespace HtmlBuilder
                 }
             }
 
-        }
-        /// <summary>
-        /// Applies/Unapplies style to the elements in the given range.
-        /// </summary>
-        /// <param name="range">Range</param>
-        /// <param name="cmd">A style command</param>
-        /// <param name="document"></param>
-        /// <param name="attributeValue">The attribute value, that fits the style command</param>
-        public void ApplyStyleCommand(MarkUpRange range, EStyleCommand cmd, IDocument document, Func<string> attributeValue)
-        {
-
-            IElement elem;
-            if (range == null)
-                throw new ArgumentNullException(nameof(range));
-            if (document == null)
-                throw new ArgumentNullException(nameof(document));
-
-            if (attributeValue == null)
-                attributeValue = () => "";
-
-            void createStyleElement()
-            {
-                elem = CreateElem(cmd, StyleAttribute, document, attributeValue);
-            }
-
-            if (cmd == EStyleCommand.FormatClear)
-            {
-                var elementWithStyle = NodeWalkFindParentElementWithAStyleAttribute(Node) as IElement;
-                if (elementWithStyle != null)
-                {
-                    elementWithStyle.RemoveAttribute(HTMLConstants.Style);
-                    if (elementWithStyle.NodeName == HTMLConstants.SpanTag)
-                    {
-                        var parentElement = NodeWalkGetParentOfElementNode(elementWithStyle) as IElement;
-                        parentElement.ReplaceChild(document.CreateTextNode(elementWithStyle.TextContent), elementWithStyle);
-                    }
-                }
-                return;
-            }
-
-            var isCmdForBlockElement = CommandIsBlockCommand(cmd);
-            var isCmdToggle = CommandIsToggleCommand(cmd);
-
-            if (isCmdForBlockElement)
-            {
-                var blockElement = NodeWalkFindBlockParent(Node) as IElement;
-                if (blockElement != null)
-                {
-                    var blockstyleAttr = blockElement.GetAttribute(HTMLConstants.Style);
-                    switch (cmd) {
-                        case EStyleCommand.TextAlignCentre:
-                        case EStyleCommand.TextAlignJustify:
-                        case EStyleCommand.TextAlignLeft:
-                        case EStyleCommand.TextAlignRight:
-                            if (attributeValue == null)
-                                attributeValue = () => "";
-
-                            StyleAttribute = ReDefineStyle(blockstyleAttr, HTMLConstants.TextAlign, attributeValue());
-                            blockElement.SetAttribute(HTMLConstants.Style, StyleAttribute);
-                            break;
-                        case EStyleCommand.Increase:
-                            StyleAttribute = SetPaddingInCreaseDecrease(blockstyleAttr, true);
-                            blockElement.SetAttribute(HTMLConstants.Style, StyleAttribute);
-                            break;
-                        case EStyleCommand.Decrease:
-                            StyleAttribute = SetPaddingInCreaseDecrease(blockstyleAttr, false);
-                            blockElement.SetAttribute(HTMLConstants.Style, StyleAttribute);
-                            break;
-                    }
-
-                }
-                return;
-            }
-
-            var rangeLength = (range.PositionEnd - range.PositionStart);
-            var posEndWord = range.PositionEnd - Offset;
-            var posStartWord = range.PositionStart > Offset ? range.PositionStart - Offset : 0;
-            string nodeText = Node.TextContent;
-            int nodeTextLength = Node.TextContent.Length;
-
-            if (nodeText.Trim().Length == 0)
-            {
-                return;
-            }
-
-            styleattribute = ((IElement)NodeWalkGetElement(Node)).GetAttribute(HTMLConstants.Style);
-            if (RangeOutreachesTexNodeLength(range, nodeTextLength))
-            {
-                ApplyElementStyle(cmd, this.Node, attributeValue, document);
-                return;
-            }
-
-            if (ContainsZeroCharachtersOrOnlyWhiteSpaces(posStartWord, posEndWord, nodeText))
-                return;
-
-            var poslength = posEndWord - posStartWord;
-            if (poslength == 0)
-                poslength = 1;
-
-            string extractedTextRange = nodeText.Substring(posStartWord, poslength);
-
-            //rangeLength == 0 -> no selection only cursor. Then apply style to the word under the cursor
-            if (rangeLength == 0)
-            {
-                var startIndex = Math.Max(nodeText.LastIndexOf(" ", posStartWord, StringComparison.InvariantCulture), nodeText.LastIndexOf((char)160, posStartWord));
-                startIndex = startIndex == -1 ? 0 : startIndex;
-
-                var endIndex = Math.Max(nodeText.IndexOf(" ", posStartWord, StringComparison.InvariantCulture), nodeText.IndexOf((char)160, posStartWord));
-                endIndex = endIndex == -1 ? nodeTextLength : endIndex;
-
-                extractedTextRange = ExtractWord(startIndex, endIndex, nodeText);
-                if (string.IsNullOrWhiteSpace(extractedTextRange))
-                    return;
-                posStartWord = startIndex == 0 ? startIndex : startIndex  + 1; 
-
-            }
-            posEndWord = extractedTextRange.Length;
-
-            if (ExtractedRangeEqualsTextRange(extractedTextRange, nodeText) || isCmdForBlockElement)
-            {
-                if (isCmdToggle)
-                {
-                    //Apply Bold on Bold => implement as a Toggle => remove bold. Same accounts for emphasis.
-                    var ret = NodeWalkGetToggleElement(Node, cmd);
-                    if (ret.Success)
-                    {
-                        if (ret.Element.GetAttribute(HTMLConstants.Style) != null)
-                        {
-                            elem = document.CreateElement("span");
-                            elem.TextContent = Node.TextContent;
-                            CopyAttributes(ret.Element, elem);
-                            ret.Element.Replace(elem);
-                        }
-                        else
-                        {
-                            var parentElement = NodeWalkGetParentOfElementNode(ret.Element) as IElement;
-                            parentElement.ReplaceChild(ret.Element.FirstChild, ret.Element);
-                            return;
-                        }
-                    }
-                }
-                ApplyElementStyle(cmd, Node, attributeValue, document);
-                return;
-            }
-
-            if (ExtractedRangeIsAtStartOfTextRange(posStartWord))
-            {
-                createStyleElement();
-                elem.TextContent = nodeText.Substring(0, posEndWord);
-
-                ((ICharacterData)Node).Data = nodeText.Substring(posEndWord);
-                Node.InsertBefore(new[] { elem });
-                return;
-            }
-
-
-            if (ExtractedRangeIsAtEndOfTextRange(posStartWord, posEndWord, extractedTextRange))
-            {
-                createStyleElement();
-                elem.TextContent = nodeText.Substring(posStartWord);
-                Node.TextContent = nodeText.Substring(0, posStartWord);
-                Node.InsertAfter(new[] { elem });
-                return;
-            }
-
-            //range is in the middle of the textnode
-            var newElementname = GetElementName(cmd);
-            if (newElementname != HTMLConstants.SpanTag)
-            {
-                var alreadyPresent = ParentElementAlreadyExists(newElementname.ToUpper(ciInvariant));
-                if (alreadyPresent != null && alreadyPresent.IndexOf(Node) != 0)
-                {
-                    //redefine all
-                    ApplyElementStyle(cmd, Node, attributeValue, document);
-                    return;
-                }
-            }
-            createStyleElement();
-            elem.TextContent = nodeText.Substring(posStartWord, posEndWord);
-
-            Node.TextContent = nodeText.Substring(0, posStartWord);
-            var restNode = Node.Clone();
-            restNode.TextContent = nodeText.Substring(posStartWord + posEndWord);
-            Node.ReplaceWith(new[] { Node.Clone(), elem, restNode });
         }
 
         private static IElement CreateListHolder(IDocument document, bool ordered) 
@@ -511,6 +683,27 @@ namespace HtmlBuilder
             return (false, node);
         }
 
+        private List<IElement> NodeWalkFindAdjacentElements(IElement element, List<string> adjacentNodeNames)
+        {
+            List<IElement> adjacents = new List<IElement>();
+            var nodeText = element.TextContent;
+
+            bool isAdjacent(INode node) {
+                var success = (node.NodeType == NodeType.Element && adjacentNodeNames.Contains(node.NodeName, StringComparer.CurrentCultureIgnoreCase) && node.TextContent == nodeText);
+                if (success)
+                {
+                    adjacents.Add(node as IElement);
+                    return false;
+                }
+                return true;
+            }
+            var ret = InitWalk(element);
+            ret = NodeWalkBack(ret, element, isAdjacent);
+
+            adjacents.Reverse();
+            return adjacents;
+        }
+
         private bool FindBlockElement(INode node)
         {
             if (node.NodeName == HTMLConstants.BodyTag)
@@ -555,109 +748,24 @@ namespace HtmlBuilder
                 || cmd == EStyleCommand.TextAlignLeft
                 || cmd == EStyleCommand.TextAlignRight
                 || cmd == EStyleCommand.Decrease
-                || cmd == EStyleCommand.Increase
-                || cmd == EStyleCommand.BulletList
-                || cmd == EStyleCommand.NumberedList;
+                || cmd == EStyleCommand.Increase;
+                //|| cmd == EStyleCommand.BulletList
+                //|| cmd == EStyleCommand.NumberedList;
         }
         private static bool CommandIsToggleCommand(EStyleCommand cmd)
         {
             return cmd == EStyleCommand.Bold
-                || cmd == EStyleCommand.Emphasis
-                || cmd == EStyleCommand.BulletList
-                || cmd == EStyleCommand.NumberedList;
-        }
-        private static (bool Success, IElement Node) NodeIsToggleNode(INode node, EStyleCommand cmd)
-        {
-            if (cmd == EStyleCommand.Emphasis)
-            {
-                if (node.NodeName == HTMLConstants.StrongTag)
-                {
-                    if (node.ParentElement.NodeName == HTMLConstants.EmTag)
-                    {
-                        return (true, node.ParentElement);
-                    }
-                }
-                if (node.NodeName == HTMLConstants.EmTag) 
-                {
-                    return (true, node as IElement);
-                }
-            }
-
-            if (cmd == EStyleCommand.Bold)
-            {
-                if (node.NodeName == HTMLConstants.StrongTag)
-                {
-                    if (node.ParentElement.NodeName == HTMLConstants.StrongTag)
-                    {
-                        return (true, node.ParentElement);
-                    }
-                }
-                if (node.NodeName == HTMLConstants.StrongTag)
-                {
-                    return (true, node as IElement);
-                }
-            }
-            return (false, node as IElement);
+                || cmd == EStyleCommand.Emphasis;
         }
         private bool RangeOutreachesTexNodeLength(MarkUpRange range, int length)
         {
             return range.PositionEnd > Offset + length;
         }
-        private void ApplyElementStyle(EStyleCommand cmd, INode node, Func<string> attributeValue, IDocument document)
-        {
-            INode parentElem = null;
-            switch (cmd)
-            {
-                case EStyleCommand.Font:
-                    StyleAttribute = ReDefineStyle(StyleAttribute, HTMLConstants.StyleFontFamily, attributeValue());
-                    ((IElement)NodeWalkGetElement(node)).SetAttribute(HTMLConstants.Style, StyleAttribute);
-                    break;
-                case EStyleCommand.Bold:
-                    parentElem = ParentElementAlreadyExists(HTMLConstants.StrongTag);
-                    if (parentElem != null)
-                    {
-                        RemoveFromParentKeepContent(node, document);
-                    }
-                    else
-                    {
-                        var strong = document.CreateElement(HTMLConstants.StrongTag);
-                        NodeWalkGetElement(node).ReplaceChild(strong, node);
-                        strong.AppendChild(node);
-                    }
-                    break;
-                case EStyleCommand.Emphasis:
-                    parentElem = ParentElementAlreadyExists(HTMLConstants.EmTag);
-                    if (parentElem != null)
-                    {
-                        RemoveFromParentKeepContent(node, document);
-                    }
-                    else
-                    {
-                        var em = document.CreateElement(HTMLConstants.EmTag);
-                        em.TextContent = node.TextContent;
-                        node.TextContent = "";
-                        NodeWalkGetElement(node).ReplaceChild(em, node);
-                    }
-                    break;
-                case EStyleCommand.Color:
-                    StyleAttribute = ReDefineStyle(StyleAttribute, HTMLConstants.StyleColor, attributeValue());
-                    ((IElement)NodeWalkGetElement(node)).SetAttribute(HTMLConstants.Style, StyleAttribute);
-                    break;
-                case EStyleCommand.BackGroundColor:
-                    StyleAttribute = ReDefineStyle(StyleAttribute, HTMLConstants.StyleBackColor, attributeValue());
-                    ((IElement)NodeWalkGetElement(node)).SetAttribute(HTMLConstants.Style, StyleAttribute);
-                    break;
-                case EStyleCommand.FormatClear:
-                    ((IElement)NodeWalkGetElement(node)).SetAttribute(HTMLConstants.Style, "");
-                    break;
-            }
-        }
         private void RemoveFromParentKeepContent(INode node, IDocument document)
         {
             (INode[] nodesBefore, INode[] nodesAfter) nodes;
             var parentElement = NodeWalkGetParentOfElementNode(node) as IElement;
-
-            nodes = FindBeforeAndAfterNodes(parentElement, TryGetParentNode(Node).Node);
+            nodes = FindBeforeAndAfterNodes(parentElement, TryGetParentNode(node).Node);
 
             var nodesAfter = nodes.nodesAfter;
             var nodesBefore = nodes.nodesBefore;
@@ -665,7 +773,7 @@ namespace HtmlBuilder
             parentElement.Replace(nodesBefore.Concat(new[] { textNode }).Concat(nodesAfter).ToArray());
 
         }
-        private INode ParentElementAlreadyExists(string nodeName)
+        private IElement ParentElementAlreadyExists(string nodeName)
         {
             var elementNode = NodeWalkGetParentOfElementNode(Node) as IElement;
             if (elementNode.NodeName == nodeName)
@@ -731,7 +839,7 @@ namespace HtmlBuilder
 
         }
 
-        private static string ReDefineStyle(string style, string styleAttribute, string newValue)
+        private static string ReDefineElementStyle(string style, string styleAttribute, string newValue)
         {
             if (style == null)
             {
@@ -741,12 +849,12 @@ namespace HtmlBuilder
                 }
                 return "";
             }
-            var elems = StyleProperties(style).ToList();
-            var alreadyhasStyle = HasStyle(elems, styleAttribute, newValue);
+            var elementAttributes = StyleProperties(style).ToList();
+            var alreadyhasStyle = HasStyle(elementAttributes, styleAttribute, newValue);
 
             var ret = "";
             bool prpIsSet = false;
-            foreach (var elem in elems)
+            foreach (var elem in elementAttributes)
             {
                 if (elem.Prp.Equals(styleAttribute, StringComparison.InvariantCultureIgnoreCase))
                 {
@@ -853,7 +961,7 @@ namespace HtmlBuilder
             {
                 case EStyleCommand.Font:
                     elem = document.CreateElement(name);
-                    elem.SetAttribute(HTMLConstants.Style, ReDefineStyle(styleAttr, HTMLConstants.StyleFontFamily, attributeValue()));
+                    elem.SetAttribute(HTMLConstants.Style, ReDefineElementStyle(styleAttr, HTMLConstants.StyleFontFamily, attributeValue()));
                     break;
                 case EStyleCommand.Bold:
                 case EStyleCommand.Emphasis:
@@ -861,11 +969,11 @@ namespace HtmlBuilder
                     break;
                 case EStyleCommand.Color:
                     elem = document.CreateElement(name);
-                    elem.SetAttribute(HTMLConstants.Style, ReDefineStyle(styleAttr, HTMLConstants.StyleColor, attributeValue()));
+                    elem.SetAttribute(HTMLConstants.Style, ReDefineElementStyle(styleAttr, HTMLConstants.StyleColor, attributeValue()));
                     break;
                 case EStyleCommand.BackGroundColor:
                     elem = document.CreateElement(name);
-                    elem.SetAttribute(HTMLConstants.Style, ReDefineStyle(styleAttr, HTMLConstants.StyleBackColor, attributeValue()));
+                    elem.SetAttribute(HTMLConstants.Style, ReDefineElementStyle(styleAttr, HTMLConstants.StyleBackColor, attributeValue()));
                     break;
             }
             return elem;
@@ -937,7 +1045,7 @@ namespace HtmlBuilder
         internal INode NodeWalkFindBlockParent(INode node)
         {
             var ret = InitWalk(node);
-            ret = NodeWalkBack(ret, Node, FindBlockElement);
+            ret = NodeWalkBack(ret, node, FindBlockElement);
             if (ret.Success)
             {
                 return ret.Node;
@@ -959,21 +1067,14 @@ namespace HtmlBuilder
             return node;
         }
 
-        internal (bool Success, IElement Element) NodeWalkGetToggleElement(INode node, EStyleCommand cmd) 
+        private bool ApplyToggle(List<IElement> adjacentElements, EStyleCommand cmd) 
         {
-            var ret = InitWalk(node);
-            ret = NodeWalkBack(ret, Node, FindElementNode);
-            if (ret.Success)
-            {
-                return NodeIsToggleNode(ret.Node, cmd);
-            }
-            return (false, node.ParentElement);
-
+            return adjacentElements.Any(elem => elem.NodeName == (cmd == EStyleCommand.Bold ? HTMLConstants.StrongTag : HTMLConstants.EmTag));
         }
         internal INode NodeWalkGetElement(INode node)
         {
             var ret = InitWalk(node);
-            ret = NodeWalkBack(ret, Node, FindElementNode);
+            ret = NodeWalkBack(ret, node, FindElementNode);
             if (ret.Success)
             {
                 return ret.Node;

@@ -15,8 +15,10 @@ namespace HtmlEditableContent
         Task RenderStyle(EStyleCommand cmd, Func<string> determineAttributeValue);
         void RenderBlockElement(string nodeName);
         Task<IDocument> GetDocument();
+        Task SetDocument(IDocument newDocument);
         MarkUpRange Position { get; set; }
         Task InsertOrUpdateElementAtCurrentPosition(IElement elem, Func<RangeNode, bool> alreadyExists, Action<RangeNode> updateAction);
+        void SetCaretPosition(int pos);
     }
     public interface IHtmlEditor
     {

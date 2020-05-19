@@ -30,10 +30,12 @@ namespace HtmlEditableContent
 
         private string _id;
         private Guid idGuid;
+        
+        [Parameter] 
+        public int CaretPosition { get; set; }
 
         [Parameter]
         public string Html { get; set; }
-
 
         #region interface IHtmlBuilder
         private IDocument document = null;
@@ -93,10 +95,20 @@ namespace HtmlEditableContent
                 await InvokeAsync(StateHasChanged);
             }
         }
+        public async Task SetDocument(IDocument newDocument) 
+        {
+            document = newDocument;
+            DocumentToMarkUpString();
+            await InvokeAsync(StateHasChanged);
+        }
         public async Task<IDocument> GetDocument()
         {
             await GetDocumentAndRange();
             return document;
+        }
+        public void SetCaretPosition(int pos) 
+        {
+            CaretPosition = pos;
         }
         public async void RenderBlockElement(string blockElement) 
         {
@@ -146,19 +158,12 @@ namespace HtmlEditableContent
                 var config = Configuration.Default;
                 var context = BrowsingContext.New(config);
 
-                //var config = Configuration.Default.WithDefaultLoader(new LoaderOptions { IsResourceLoadingEnabled = true }).WithCss();
-                //var context = BrowsingContext.New(config);
-                //var address = "http://www.example.com"; // any reason for dropping the protocol?
-                //var document = await context.OpenAsync(address);
-                //var sheet = document.QuerySelector<IHtmlLinkElement>("link[rel=stylesheet]")?.Sheet;
-
                 document = await context.OpenAsync(req => req.Content(Html));
                 //var sheet = await context.GetCssStyling().ParseStylesheetAsync(new AngleSharp.Io.DefaultResponse(), new StyleOptions(document), new System.Threading.CancellationToken());
                 await HtmlBuilderInterop.AddEventListener(JSRuntime, Id);
                 RazorInstances.BuilderInstances.Add(idGuid, this);
             }
-            var position = new MarkUpRange() { PositionEnd = 0, PositionStart = 0 };
-            await HtmlBuilderInterop.SetContent(JSRuntime, Id, $"<span>{Html}</span>", position.PositionStart == -1 ? 0 : position.PositionStart, position.PositionEnd == -1 ? 0 : position.PositionEnd);
+            await HtmlBuilderInterop.SetContent(JSRuntime, Id, $"<span>{Html}</span>", CaretPosition == -1 ? 0 : CaretPosition, CaretPosition == -1 ? 0 : CaretPosition);
         }
        
         protected override void BuildRenderTree(RenderTreeBuilder builder)

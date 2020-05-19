@@ -1,5 +1,7 @@
 ﻿export class MarkUpElementRange {
 
+    static voidNodeTags = ['AREA', 'BASE', 'BR', 'COL', 'EMBED', 'HR', 'IMG', 'INPUT', 'KEYGEN', 'LINK', 'MENUITEM', 'META', 'PARAM', 'SOURCE', 'TRACK', 'WBR', 'BASEFONT', 'BGSOUND', 'FRAME', 'ISINDEX'];
+
     constructor() { }
 
     private nodewalk(node: Node, func: (node: Node) => boolean): boolean {
@@ -7,6 +9,45 @@
         for (node = node.firstChild; result !== false && node; node = node.nextSibling)
             result = this.nodewalk(node, func);
         return result;
+    }
+
+    private getLastChildNode(root: Node): Node
+    {
+        let lc = root.lastChild;
+        while (lc && lc.nodeType !== lc.ELEMENT_NODE) {
+            if (lc.previousSibling)
+                lc = lc.previousSibling;
+            else
+                break;
+        }
+        return lc;
+    }
+
+    private canContainText(node): boolean
+    {
+        if (node.nodeType === node.ELEMENT_NODE) { //is an element node
+            return !(MarkUpElementRange.voidNodeTags.indexOf(node.nodeName) > 0);
+        } 
+        return false;
+    }
+
+    public IsLastChild(root: Node, node: Node): boolean
+    {
+        let contentEditableElement: Node;
+        contentEditableElement = root;
+        while (this.getLastChildNode(contentEditableElement) &&
+            this.canContainText(this.getLastChildNode(contentEditableElement)))
+        {
+            contentEditableElement = this.getLastChildNode(contentEditableElement);
+        }
+        if (node.nodeType === node.TEXT_NODE)
+        {
+            return contentEditableElement === node.parentElement;
+        }
+        else
+        {
+            return contentEditableElement === node;
+        }
     }
 
     public createCursorRange(elem: HTMLElement, nrOfChars: number): [Range, Node]

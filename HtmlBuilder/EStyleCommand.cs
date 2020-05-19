@@ -14,7 +14,7 @@
         TextAlignRight,
         TextAlignCentre,
         TextAlignJustify,
-        NumberedList,
-        BulletList
+        //NumberedList,
+        //BulletList
     }
 }

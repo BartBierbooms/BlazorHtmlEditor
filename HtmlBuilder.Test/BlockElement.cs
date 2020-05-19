@@ -6,15 +6,13 @@ using System.Threading.Tasks;
 using System.Linq;
 namespace HtmlBuilder.Test
 {
-    public class BlockElement
+    public class BlockElement : TestBase
     {
         [Test]
         public async Task EmptyHtml_SetToHeading1_HtmlIsRenderedAsHeading1()
         {
-            string html = @"<div></div>";
+            var bodyNodes = await base.bodyNodes(@"<div></div>");
             string assertedHtml = "<body><h1></h1></body>";
-            var document = await Factory.DocumentFactory.GetDocument(html);
-            var bodyNodes = document.Body.GetDescendants();
 
             MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 1, PositionStart = 1 };
 
@@ -33,9 +31,8 @@ namespace HtmlBuilder.Test
         public async Task SingleDiv_SetToHeading1_HtmlIsRenderedAsHeading1()
         {
             string html = @"<div>the red and blue source</div>";
+            var bodyNodes = await base.bodyNodes(html);
             string assertedHtml = "<body><h1>the red and blue source</h1></body>";
-            var document = await Factory.DocumentFactory.GetDocument(html);
-            var bodyNodes = document.Body.GetDescendants();
 
             MarkUpRange selectionRange = MarkUpRangeFactory.CursorRange(html);
 
@@ -55,8 +52,7 @@ namespace HtmlBuilder.Test
         {
             string html = @"<div>the red and blue source</div><div>second line</div>";
             string assertedHtml = "<body><h1>the red and blue source</h1><div>second line</div></body>";
-            var document = await Factory.DocumentFactory.GetDocument(html);
-            var bodyNodes = document.Body.GetDescendants();
+            var bodyNodes = await base.bodyNodes(html);
 
             MarkUpRange selectionRange = MarkUpRangeFactory.CursorRange(html);
 
@@ -75,8 +71,7 @@ namespace HtmlBuilder.Test
         {
             string html = @"<div>the red and blue source</div><div>second line</div>";
             string assertedHtml = "<body><div>the red and blue source</div><h1>second line</h1></body>";
-            var document = await Factory.DocumentFactory.GetDocument(html);
-            var bodyNodes = document.Body.GetDescendants();
+            var bodyNodes = await base.bodyNodes(html);
 
             MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 26, PositionStart = 25 };
 
@@ -95,8 +90,7 @@ namespace HtmlBuilder.Test
         {
             string html = @"<body><div style=""font-family:Courier;"">the red and blue source</div></body>";
             string assertedHtml = @"<body><h1 style=""font-family:Courier;"">the red and blue source</h1></body>";
-            var document = await Factory.DocumentFactory.GetDocument(html);
-            var bodyNodes = document.Body.GetDescendants();
+            var bodyNodes = await base.bodyNodes(html);
 
             MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 2, PositionStart = 2 };
 
@@ -116,8 +110,7 @@ namespace HtmlBuilder.Test
         {
             string html = @"<body><div style=""font-family:Courier;"">the <span style=""color:red"">red and <span style=""color:blue"">blue </span></span>source <span style=""color:orange"">from holland </span> with greetings</div><p>This is a paragraph element</p></body>";
             string assertedHtml = @"<body><h1 style=""font-family:Courier;"">the <span style=""color:red"">red and <span style=""color:blue"">blue </span></span>source <span style=""color:orange"">from holland </span> with greetings</h1><p>This is a paragraph element</p></body>";
-            var document = await Factory.DocumentFactory.GetDocument(html);
-            var bodyNodes = document.Body.GetDescendants();
+            var bodyNodes = await base.bodyNodes(html);
 
             MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 18, PositionStart = 18 };
 
@@ -137,8 +130,7 @@ namespace HtmlBuilder.Test
         {
             string html = @"<body><h1 style=""font-family:Courier;"">the <span style=""color:red"">red and <span style=""color:blue"">blue </span></span>source <span style=""color:orange"">from holland </span> with greetings</h1><p>This is a paragraph element</p></body>";
             string assertedHtml = @"<body><div style=""font-family:Courier;"">the <span style=""color:red"">red and <span style=""color:blue"">blue </span></span>source <span style=""color:orange"">from holland </span> with greetings</div><p>This is a paragraph element</p></body>";
-            var document = await Factory.DocumentFactory.GetDocument(html);
-            var bodyNodes = document.Body.GetDescendants();
+            var bodyNodes = await base.bodyNodes(html);
 
             MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 18, PositionStart = 18 };
 
@@ -158,8 +150,7 @@ namespace HtmlBuilder.Test
         {
             string html = @"<body><div style=""font-family:Courier;"">the<span style=""color:red"">red and <span style=""color:blue"">blue </span></span>source</div><p>This is a paragraph element</p></body>";
             string assertedHtml = @"<body><h1 style=""font-family:Courier;"">the<span style=""color:red"">red and <span style=""color:blue"">blue </span></span>source</h1><p>This is a paragraph element</p></body>";
-            var document = await Factory.DocumentFactory.GetDocument(html);
-            var bodyNodes = document.Body.GetDescendants();
+            var bodyNodes = await base.bodyNodes(html);
 
             MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 2, PositionStart = 2 };
             //MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 18, PositionStart = 18 };
@@ -180,8 +171,7 @@ namespace HtmlBuilder.Test
         {
             string html = "<div><h1>the red and blue source</h1><div>rest</div></div>";
             string assertedHtml = @"<body><div><div>the red and blue source</div><div>rest</div></div></body>";
-            var document = await Factory.DocumentFactory.GetDocument(html);
-            var bodyNodes = document.Body.GetDescendants();
+            var bodyNodes = await base.bodyNodes(html);
 
             MarkUpRange selectionRange = MarkUpRangeFactory.CursorRangeHeading(html); 
 
@@ -201,8 +191,7 @@ namespace HtmlBuilder.Test
         {
             string html = "<div><h1>the red and blue source</h1><div>rest</div></div>";
             string assertedHtml = @"<body><div><div>the red and blue source</div><div>rest</div></div></body>";
-            var document = await Factory.DocumentFactory.GetDocument(html);
-            var bodyNodes = document.Body.GetDescendants();
+            var bodyNodes = await base.bodyNodes(html);
 
             MarkUpRange selectionRange = MarkUpRangeFactory.CursorRangeHeading(html);
 
@@ -222,8 +211,7 @@ namespace HtmlBuilder.Test
         {
             string html = "<div><h1>the red and blue source</h1><div>rest</div></div>";
             string assertedHtml = @"<body><div><h2>the red and blue source</h2><div>rest</div></div></body>";
-            var document = await Factory.DocumentFactory.GetDocument(html);
-            var bodyNodes = document.Body.GetDescendants();
+            var bodyNodes = await base.bodyNodes(html);
 
             MarkUpRange selectionRange = MarkUpRangeFactory.CursorRangeHeading(html);
 
@@ -243,8 +231,7 @@ namespace HtmlBuilder.Test
             string html = "<div>the <span>red</span> and blue source</div>";
             string assertedHtml = @"<body><h1>the <span>red</span> and blue source</h1></body>";
 
-            var document = await Factory.DocumentFactory.GetDocument(html);
-            var bodyNodes = document.Body.GetDescendants();
+            var bodyNodes = await base.bodyNodes(html);
 
             MarkUpRange selectionRange = new MarkUpRange() { PositionEnd= 5, PositionStart = 5};
 
@@ -264,8 +251,7 @@ namespace HtmlBuilder.Test
         {
             var html = @"<div>​first paragraphe</div><div>​second paragraphe</div>";
             string assertedHtml = @"<body><div>​first paragraphe</div><h1>​second paragraphe</h1></body>";
-            var document = await Factory.DocumentFactory.GetDocument(html);
-            var bodyNodes = document.Body.GetDescendants();
+            var bodyNodes = await base.bodyNodes(html);
 
             MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 20, PositionStart = 20 };
 
@@ -286,8 +272,7 @@ namespace HtmlBuilder.Test
         {
             var html = @"<div>​first paragraphe</div>";
             string assertedHtml = @"<body><ul><li>​first paragraphe</li></ul></body>";
-            var document = await Factory.DocumentFactory.GetDocument(html);
-            var bodyNodes = document.Body.GetDescendants();
+            var bodyNodes = await base.bodyNodes(html);
 
             MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 5, PositionStart = 5 };
 
@@ -308,8 +293,7 @@ namespace HtmlBuilder.Test
         {
             var html = @"<div>​first paragraphe</div>";
             string assertedHtml = @"<body><ol><li>​first paragraphe</li></ol></body>";
-            var document = await Factory.DocumentFactory.GetDocument(html);
-            var bodyNodes = document.Body.GetDescendants();
+            var bodyNodes = await base.bodyNodes(html);
 
             MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 5, PositionStart = 5 };
 
@@ -324,27 +308,51 @@ namespace HtmlBuilder.Test
             await Task.FromResult(0);
 
         }
+        #region subcommands
+        [Test]
+        public async Task ApplyStyle_SetColorRed_DivIsWithColorRed()
+        {
+            var html = @"<div>​first paragraphe</div>";
+            string assertedHtml = @"<body><div style=""color:red;"">​first paragraphe</div></body>";
+            var bodyNodes = await base.bodyNodes(html);
 
-        //[Test]
-        //public async Task OrderedList_setNextDivToOrderedList_DivIsRenderedAsPartOfOrderedList()
-        //{
-        //    var html = @"<ol><li>​first paragraphe</li><div>Second paragraph</div></ol>";
-        //    string assertedHtml = @"<body><ol><li>​first paragraphe</li><li>Second paragraph</li></ol></body>";
-        //    var document = await Factory.DocumentFactory.GetDocument(html);
-        //    var bodyNodes = document.Body.GetDescendants();
+            MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 5, PositionStart = 5 };
 
-        //    MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 20, PositionStart = 20 };
+            var ranges = RangeNode.InRange(bodyNodes, selectionRange);
+            var range = ranges.First();
 
-        //    var ranges = RangeNode.InRange(bodyNodes, selectionRange);
-        //    var range = ranges.First();
+            range.ApplyElementStyle(EStyleCommand.Color, range.Node.ParentElement, () => "red", document);
+            var newHtml = document.Body.ToHtml();
 
-        //    range.ApplyBlockCommand("UL", document);
-        //    var newHtml = document.Body.ToHtml();
+            Assert.IsTrue(ranges.Count() == 1);
+            Assert.AreEqual(newHtml, assertedHtml);
+            await Task.FromResult(0);
 
-        //    Assert.IsTrue(ranges.Count() == 1);
-        //    Assert.AreEqual(newHtml, assertedHtml);
-        //    await Task.FromResult(0);
+        }
 
-        //}
+        [Test]
+        public async Task InsertElement_InsertEm_EmIsInserted()
+        {
+            var html = @"<div>​first paragraphe</div>";
+            string assertedHtml = @"<body><div>​first<em>an emphasis</em> paragraphe</div></body>";
+            var bodyNodes = await base.bodyNodes(html);
+
+            MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 5, PositionStart = 5 };
+
+            var ranges = RangeNode.InRange(bodyNodes, selectionRange);
+            var range = ranges.First();
+            
+            var em = document.CreateElement(HTMLConstants.EmTag);
+            em.TextContent = "an emphasis";
+            range.InsertElementAtCurrentPosition(em, 6);
+            var newHtml = document.Body.ToHtml();
+
+            Assert.IsTrue(ranges.Count() == 1);
+            Assert.AreEqual(newHtml, assertedHtml);
+            await Task.FromResult(0);
+
+        }
+        #endregion
+
     }
 }

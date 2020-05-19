@@ -10,7 +10,7 @@ namespace BlazorHtmlEditor
         public string Description { get; set; }
         public string Width { get; set; }
         public string Height { get; set; }
-
+        public bool EditMode { get; set; }
         public bool IsValid()
         {
             return !string.IsNullOrWhiteSpace(Source);

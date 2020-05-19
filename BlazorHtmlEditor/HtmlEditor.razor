@@ -80,75 +80,169 @@
     </MatDialogContent>
 </MatDialog>
 
-<MatDialog @bind-IsOpen="@imageDialog">
-    <MatDialogTitle>Insert/Edit image</MatDialogTitle>
+<MatDialog @bind-IsOpen="@audioDialog">
+    <MatDialogTitle>Insert/Edit Audio</MatDialogTitle>
     <MatDialogContent>
-        <p>Source</p>
-        <MatTextField Value="@image.Source" OnInput="@(evt=> {
+        <MatTabGroup @bind-ActiveIndex="@audioTabIndex">
+            <MatTab Label="Audio">
+                <p>Source</p>
+                <MatTextField Value="@audio.Source" OnInput="@(evt=> {
+                                                           audio.Source = evt.Value.ToString();
+                                                           audio.IsValid();
+                                                       })"></MatTextField>
+                <p>Preload</p>
+                <MatSelectValue @bind-Value="@audio.Preload" Items="@AudioPreLoadValues" ValueSelector=@(i => {
+                                                                                                             audio.IsValid();
+                                                                                                             return i;
+                                                                                                         })> </MatSelectValue>
+                <hr />
+                <MatCheckbox @bind-Value="@audio.Controls" Label="Display play stop buttons" Disabled="true" ></MatCheckbox>
+                <MatCheckbox @bind-Value="@audio.Loop" Label="Keep repeating audio"> </MatCheckbox>
+                <MatCheckbox @bind-Value="@audio.Muted" Label="Start muted"></MatCheckbox>
+                <MatCheckbox @bind-Value="@audio.Autoplay" Label="Auto play"></MatCheckbox>
+                <hr />
+            </MatTab>
+            <MatTab Label="All">
+                @if (audios.Any())
+                {
+                    @foreach (var item in audios)
+                    {
+                        <div>
+                            @item.ToHtml()
+                            <MatButton OnClick="@(() => MakeActiveAudio(item))">Update</MatButton>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <h4>No audio discovered in document</h4>
+                }
+            </MatTab>
+        </MatTabGroup>
+    </MatDialogContent>
+    <MatDialogActions>
+        @if (audioTabIndex == 0)
+        {
+            @if (audio.EditMode)
+            {
+                <MatButton OnClick="@(() => RenderAudio(true))">Close</MatButton>
+                <MatButton OnClick="@(() => RemoveAudio())">Remove</MatButton>
+                <MatButton Disabled="@(!audio.IsValid())" OnClick="@(() => UpdateAudio())">Update</MatButton>
+            }
+            else
+            {
+                <MatButton OnClick="@(() => RenderAudio(true))">Cancel</MatButton>
+                <MatButton Disabled="@(!audio.IsValid())" OnClick="@(() => RenderAudio(false))">OK</MatButton>
+            }
+        }
+    </MatDialogActions>
+
+</MatDialog>
+<MatDialog @bind-IsOpen="@imageDialog">
+        <MatDialogTitle>Insert/Edit image</MatDialogTitle>
+        <MatDialogContent>
+            <MatTabGroup @bind-ActiveIndex="@imageTabIndex">
+                <MatTab Label="Image">
+                    <p>Source</p>
+                    <MatTextField Value="@image.Source" OnInput="@(evt=> {
                                                            image.Source = evt.Value.ToString();
                                                            image.IsValid();
                                                        })"></MatTextField>
-        <p>Description</p>
-        <MatTextField Value="@image.Description" OnInput="@(evt=> { image.Description = evt.Value.ToString();
+                    <p>Description</p>
+                    <MatTextField Value="@image.Description" OnInput="@(evt=> { image.Description = evt.Value.ToString();
                                                                 image.IsValid();
                                                             })"></MatTextField>
-        <p>Widht</p>
-        <MatTextField Value="@image.Width" OnInput="@(evt=> { image.Width = evt.Value.ToString();
+                    <p>Widht</p>
+                    <MatTextField Value="@image.Width" OnInput="@(evt=> { image.Width = evt.Value.ToString();
                                                           image.IsValid();
                                                       })"></MatTextField>
-        <p>Height</p>
-        <MatTextField Value="@image.Height" OnInput="@(evt=> { image.Height = evt.Value.ToString();
+                    <p>Height</p>
+                    <MatTextField Value="@image.Height" OnInput="@(evt=> { image.Height = evt.Value.ToString();
                                                            image.IsValid();
                                                        })"></MatTextField>
-    </MatDialogContent>
-    <MatDialogActions>
-        <MatButton OnClick="@(() =>RenderImage(true))">Cancel</MatButton>
-        <MatButton Disabled="@(!image.IsValid())" OnClick="@(() => RenderImage(false))">OK</MatButton>
-    </MatDialogActions>
-</MatDialog>
+                </MatTab>
+                <MatTab Label="All">
+                    @if (images.Any())
+                    {
+                        @foreach (var item in images)
+                        {
+                            <div>
+                                @if (!string.IsNullOrWhiteSpace(item.Description))
+                                {
+                                    <h4>@item.Description</h4>
+                                }
+                                <img style="image-rendering: auto;" width="50" height="50" src="@item.Source" />
+                                <MatButton OnClick="@(() => MakeActiveImage(item))">Make active</MatButton>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <h4>No images discovered in document</h4>
+                    }
+                </MatTab>
+            </MatTabGroup>
+        </MatDialogContent>
+        <MatDialogActions>
+            @if (imageTabIndex == 0)
+            {
+                @if (image.EditMode)
+                {
+                    <MatButton OnClick="@(() => RenderImage(true))">Close</MatButton>
+                    <MatButton OnClick="@(() => RemoveImage())">Remove</MatButton>
+                    <MatButton Disabled="@(!image.IsValid())" OnClick="@(() => UpdateImage())">Update</MatButton>
+                }
+                else
+                {
+                    <MatButton OnClick="@(() => RenderImage(true))">Cancel</MatButton>
+                    <MatButton Disabled="@(!image.IsValid())" OnClick="@(() => RenderImage(false))">OK</MatButton>
+                }
+            }
+        </MatDialogActions>
+    </MatDialog>
 
-<MatDialog @bind-IsOpen="@hRefLinkDialog">
-    <MatDialogTitle>Hyperlink</MatDialogTitle>
-    <MatDialogContent>
-        <p>Description</p>
-        <MatTextField Value="@link.Description" OnInput="@(evt=> {
+    <MatDialog @bind-IsOpen="@hRefLinkDialog">
+        <MatDialogTitle>Hyperlink</MatDialogTitle>
+        <MatDialogContent>
+            <p>Description</p>
+            <MatTextField Value="@link.Description" OnInput="@(evt=> {
                                                                link.Description = evt.Value.ToString();
                                                                link.IsValid();
                                                            })"></MatTextField>
-        <p>Url</p>
-        <MatTextField Value="@link.Link" OnInput="@(evt=> { link.Link = evt.Value.ToString();
+            <p>Url</p>
+            <MatTextField Value="@link.Link" OnInput="@(evt=> { link.Link = evt.Value.ToString();
                                                         link.IsValid();
                                                     })"></MatTextField>
-        <MatSelect Label="Target" @bind-Value="link.Target">
-            <MatOptionString></MatOptionString>
-            <MatOptionString Value="_blank">Blank</MatOptionString>
-            <MatOptionString Value="_self">Self</MatOptionString>
-            <MatOptionString Value="_parent">Parent</MatOptionString>
-            <MatOptionString Value="_top">Top</MatOptionString>
-        </MatSelect>
-    </MatDialogContent>
-    <MatDialogActions>
-        <MatButton OnClick="@(() =>RenderLink(true))">Cancel</MatButton>
-        <MatButton Disabled="@(!link.IsValid())" OnClick="@(() => RenderLink(false))">OK</MatButton>
-    </MatDialogActions>
-</MatDialog>
-<MatMenu @ref="MnuFile">
-    <MatList>
-        <MatListItem @onclick="OnMnuItemNewClick">New</MatListItem>
-        <MatListItem @onclick="OnMnuItemSaveClick">Save</MatListItem>
-    </MatList>
-</MatMenu>
-<MatMenu @ref="MnuEdit">
-    <MatList>
-        <MatListItem @onclick="OnMnuItemImageClick">Image</MatListItem>
-        <MatListItem @onclick="OnMnuItemLinkClick">Link</MatListItem>
-        <MatListItem @onclick="OnMnuItemMediaClick">Media</MatListItem>
-    </MatList>
-</MatMenu>
-<MatMenu @ref="MnuView">
-    <MatList>
-        <MatListItem @onclick="OnMnuItemSourceClick">Source</MatListItem>
-        <MatListItem @onclick="OnMnuItemExampleClick">Example</MatListItem>
-    </MatList>
-</MatMenu>
+            <MatSelect Label="Target" @bind-Value="link.Target">
+                <MatOptionString></MatOptionString>
+                <MatOptionString Value="_blank">Blank</MatOptionString>
+                <MatOptionString Value="_self">Self</MatOptionString>
+                <MatOptionString Value="_parent">Parent</MatOptionString>
+                <MatOptionString Value="_top">Top</MatOptionString>
+            </MatSelect>
+        </MatDialogContent>
+        <MatDialogActions>
+            <MatButton OnClick="@(() =>RenderLink(true))">Cancel</MatButton>
+            <MatButton Disabled="@(!link.IsValid())" OnClick="@(() => RenderLink(false))">OK</MatButton>
+        </MatDialogActions>
+    </MatDialog>
+    <MatMenu @ref="MnuFile">
+        <MatList>
+            <MatListItem @onclick="OnMnuItemNewClick">New</MatListItem>
+            <MatListItem @onclick="OnMnuItemSaveClick">Save</MatListItem>
+        </MatList>
+    </MatMenu>
+    <MatMenu @ref="MnuEdit">
+        <MatList>
+            <MatListItem @onclick="OnMnuItemLinkClick">Link</MatListItem>
+            <MatListItem @onclick="OnMnuItemImageClick">Image</MatListItem>
+            <MatListItem @onclick="OnMnuItemMediaClick">Audio</MatListItem>
+        </MatList>
+    </MatMenu>
+    <MatMenu @ref="MnuView">
+        <MatList>
+            <MatListItem @onclick="OnMnuItemSourceClick">Source</MatListItem>
+            <MatListItem @onclick="OnMnuItemExampleClick">Example</MatListItem>
+        </MatList>
+    </MatMenu>
 

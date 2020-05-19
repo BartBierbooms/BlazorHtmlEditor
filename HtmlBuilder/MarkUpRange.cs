@@ -5,6 +5,9 @@ using System.Threading.Tasks;
 
 namespace HtmlBuilder
 {
+    /// <summary>
+    /// Class that identifies a range. 
+    /// </summary>
     public class MarkUpRange
     {
         public MarkUpRange() { }

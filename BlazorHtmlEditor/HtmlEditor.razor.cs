@@ -68,9 +68,10 @@ namespace BlazorHtmlEditor
             source = document.Body.FirstElementChild.ToHtml();
             await OnSave.InvokeAsync(source).ConfigureAwait(true);
         }
-        private void OnMnuItemMediaClick()
+        private async void OnMnuItemMediaClick()
         {
-            Console.WriteLine("Todo insert media");
+            audioDialog = true;
+            await InvokeAsync(StateHasChanged).ConfigureAwait(true);
         }
         private async void OnMnuItemExampleClick()
         {
@@ -94,6 +95,7 @@ namespace BlazorHtmlEditor
             MnuFile.OpenAsync(FileMnuButton.Ref);
         }
         #endregion
+        private static List<string> AudioPreLoadValues => new List<string>(new[] { "auto", "metadata", "none" });
 
         private string selector = "";
         private string Selector { get {
@@ -115,13 +117,56 @@ namespace BlazorHtmlEditor
 
         private bool hRefLinkDialog { get; set; }
         private bool imageDialog { get; set; }
+        private bool audioDialog { get; set; }
         private bool sourceDialog { get; set; }
         private bool ExampleDialog { get; set; }
         private bool disableHRefLink { get; set; }
         private bool RangeSelectionInRef { get; set; }
         private HRef link { get; set; } = new HRef();
-        private Image image { get; set; } = new Image();
 
+        private int _imageTabIndex;
+        private int _audioTabIndex;
+        private int imageTabIndex { get => _imageTabIndex; set {
+                if (value == 1)
+                {
+                    Task.Run(
+                        async () =>
+                        {
+                            images = await GetDocumentImages().ConfigureAwait(true);
+                            _imageTabIndex = value;
+                            await InvokeAsync(StateHasChanged).ConfigureAwait(true);
+                        });
+                }
+                else
+                {
+                    _imageTabIndex = value;
+                }
+            } 
+        }
+        private int audioTabIndex
+        {
+            get => _audioTabIndex; set
+            {
+                if (value == 1)
+                {
+                    Task.Run(
+                        async () =>
+                        {
+                            audios = await GetDocumentAudios().ConfigureAwait(true);
+                            _audioTabIndex = value;
+                            await InvokeAsync(StateHasChanged).ConfigureAwait(true);
+                        });
+                }
+                else
+                {
+                    _audioTabIndex = value;
+                }
+            }
+        }
+        private Image image { get; set; } = new Image();
+        private List<Image> images { get; set; } = new List<Image>();
+        private Audio audio { get; set; } = new Audio();
+        private List<Audio> audios { get; set; } = new List<Audio>();
         /// <summary>
         /// default colors. Provide your own using parameter
         /// </summary>
@@ -553,6 +598,249 @@ namespace BlazorHtmlEditor
         {
             RenderStyle(EStyleCommand.TextAlignLeft);
         }
+        private async Task<List<Audio>> GetDocumentAudios()
+        {
+            var document = await htmlBuilder.GetDocument().ConfigureAwait(true);
+            var elems = document.QuerySelectorAll("audio");
+            return (from e in elems
+                    select new Audio()
+                    {
+                        Autoplay = e.HasAttribute("autoplay"),
+                        Controls = e.HasAttribute("controls"),
+                        Loop = e.HasAttribute("loop"),
+                        Muted = e.HasAttribute("muted"),
+                        Preload = e.HasAttribute("preload") ? e.GetAttribute("preload") : "",
+                        Source = e.GetAttribute("src")
+                    }).ToList();
+
+
+        }
+
+        private async Task<List<Image>> GetDocumentImages()
+        {
+            var document = await htmlBuilder.GetDocument().ConfigureAwait(true);
+            var elems = document.QuerySelectorAll("img");
+            return (from e in elems
+                    select new Image()
+                    { 
+                        Description =e.GetAttribute("alt"),
+                        Height= e.GetAttribute("heigth"),
+                        Width= e.GetAttribute("width"),
+                        Source= e.GetAttribute("src")
+                    }).ToList();
+            
+
+        }
+        private void MakeActiveImage(Image img) 
+        {
+            image = img;
+            img.EditMode = true;
+            imageTabIndex = 0;
+        }
+        private void MakeActiveAudio(Audio audio)
+        {
+            this.audio = audio;
+            this.audio.EditMode = true;
+            audioTabIndex = 0;
+        }
+        private async void RemoveAudio()
+        {
+            var document = await htmlBuilder.GetDocument().ConfigureAwait(true);
+            document.QuerySelectorAll("audio").ElementAt(audios.IndexOf(audio)).RemoveFromParent();
+            await htmlBuilder.SetDocument(document).ConfigureAwait(true);
+        }
+        private async void RemoveImage() 
+        {
+            var document = await htmlBuilder.GetDocument().ConfigureAwait(true);
+            document.QuerySelectorAll("img").ElementAt(images.IndexOf(image)).RemoveFromParent();
+            await htmlBuilder.SetDocument(document).ConfigureAwait(true);
+        }
+        private async void UpdateAudio()
+        {
+            var document = await htmlBuilder.GetDocument().ConfigureAwait(true);
+            var audioElem = document.QuerySelectorAll("audio").ElementAt(audios.IndexOf(this.audio));
+            if (!audio.Autoplay)
+            {
+                audioElem.RemoveAttribute("autoplay");
+            }
+            else
+            {
+                audioElem.SetAttribute("autoplay", "autoplay");
+            }
+            if (!audio.Controls)
+            {
+                audioElem.RemoveAttribute("controls");
+            }
+            else
+            {
+                audioElem.SetAttribute("controls", "controls");
+            }
+            if (!audio.Loop)
+            {
+                audioElem.RemoveAttribute("loop");
+            }
+            else
+            {
+                audioElem.SetAttribute("loop", "loop");
+            }
+            if (!audio.Muted)
+            {
+                audioElem.RemoveAttribute("muted");
+            }
+            else
+            {
+                audioElem.SetAttribute("muted", "muted");
+            }
+            if (string.IsNullOrWhiteSpace(audio.Preload))
+            {
+                audioElem.RemoveAttribute("preload");
+            }
+            else
+            {
+                audioElem.SetAttribute("prealod", audio.Preload);
+            }
+            audioElem.SetAttribute("src", audio.Source);
+
+            await htmlBuilder.SetDocument(document).ConfigureAwait(true);
+        }
+
+        private async void UpdateImage()
+        {
+            var document = await htmlBuilder.GetDocument().ConfigureAwait(true);
+            var img = document.QuerySelectorAll("img").ElementAt(images.IndexOf(image));
+            if (string.IsNullOrWhiteSpace(image.Description)) 
+            {
+                img.RemoveAttribute("alt");
+            }
+            else 
+            {
+                img.SetAttribute("alt", image.Description);
+            }
+            if (string.IsNullOrWhiteSpace(image.Height))
+            {
+                img.RemoveAttribute("height");
+            }
+            else 
+            {
+                img.SetAttribute("height", image.Height);
+            }
+            if (string.IsNullOrWhiteSpace(image.Width))
+            {
+                img.RemoveAttribute("width");
+            }
+            else
+            {
+                img.SetAttribute("width", image.Width);
+            }
+            img.SetAttribute("src", image.Source);
+
+            await htmlBuilder.SetDocument(document).ConfigureAwait(true);
+        }
+        private async Task RenderAudio(bool cancelled)
+        {
+            audioDialog = false;
+            if (cancelled)
+            {
+                audio = new Audio();
+                return;
+            }
+
+            bool isAudioNode(RangeNode rn)
+            {
+                var sibling = rn.Node?.NextSibling?.NodeName == "AUDIO";
+                if (sibling)
+                {
+                    return Position.PositionStart == Position.PositionEnd && Position.PositionStart == rn.Offset + rn.Node.TextContent.Length - 1;
+                }
+                return false;
+            }
+            var elem = htmlBuilder.Document.CreateElement("audio");
+            elem.SetAttribute("src", audio.Source);
+            if (audio.Autoplay) 
+            {
+                elem.SetAttribute("autoplay", "autoplay");
+            }
+            else 
+            {
+                elem.RemoveAttribute("autoplay");
+            }
+            if (audio.Controls)
+            {
+                elem.SetAttribute("controls", "controls");
+            }
+            else
+            {
+                elem.RemoveAttribute("controls");
+            }
+            if (audio.Loop)
+            {
+                elem.SetAttribute("loop", "loop");
+            }
+            else
+            {
+                elem.RemoveAttribute("loop");
+            }
+            if (audio.Muted)
+            {
+                elem.SetAttribute("muted", "muted");
+            }
+            else
+            {
+                elem.RemoveAttribute("muted");
+            }
+
+            if (string.IsNullOrWhiteSpace(audio.Preload))
+            {
+                elem.SetAttribute("preload", "auto");
+            }
+            else
+            {
+                elem.SetAttribute("preload", audio.Preload);
+            }
+
+            elem.SetAttribute("src", audio.Source);
+
+            void updateAudio(RangeNode rangeNode)
+            {
+                var audioElem = rangeNode.Node.ParentElement;
+                audioElem.SetAttribute("src", audio.Source);
+                if (audio.Loop)
+                {
+                    audioElem.SetAttribute("loop", "loop");
+                }
+                else
+                {
+                    audioElem.RemoveAttribute("loop");
+                }
+                if (audio.Muted)
+                {
+                    audioElem.SetAttribute("muted", "muted");
+                }
+                else
+                {
+                    audioElem.RemoveAttribute("muted");
+                }
+                if (audio.Controls)
+                {
+                    audioElem.SetAttribute("controls", "controls");
+                }
+                else
+                {
+                    audioElem.RemoveAttribute("controls");
+                }
+                if (audio.Autoplay)
+                {
+                    audioElem.SetAttribute("autoplay", "autoplay");
+                }
+                else
+                {
+                    audioElem.RemoveAttribute("autoplay");
+                }
+            }
+            audio.EditMode = false;
+            htmlBuilder.SetCaretPosition(Position.PositionStart);
+            await htmlBuilder.InsertOrUpdateElementAtCurrentPosition(elem, rn => isAudioNode(rn), updateAudio).ConfigureAwait(true);
+        }
         private async Task RenderImage(bool cancelled) 
         {
             imageDialog = false;
@@ -582,6 +870,8 @@ namespace BlazorHtmlEditor
                 imgElem.SetAttribute("heigth", image.Height);
                 imgElem.SetAttribute("width", image.Width);
             }
+            image.EditMode = false;
+            htmlBuilder.SetCaretPosition(Position.PositionStart);
             await htmlBuilder.InsertOrUpdateElementAtCurrentPosition(elem, rn => isImageNode(rn), updateImage).ConfigureAwait(true);
 
         }
@@ -606,7 +896,7 @@ namespace BlazorHtmlEditor
                 hRefElem.SetAttribute("href", link.Link);
                 hRefElem.TextContent = link.Description;
             }
-
+            htmlBuilder.SetCaretPosition(Position.PositionStart);
             await htmlBuilder.InsertOrUpdateElementAtCurrentPosition(elem, rn => rn.Node.ParentElement.NodeName == "A", updateLink).ConfigureAwait(true);
         }
 
@@ -621,11 +911,13 @@ namespace BlazorHtmlEditor
         private async void RenderTextBulletList()
         {
             htmlBuilder.RenderBlockElement(HTMLConstants.OlTag);
+            htmlBuilder.SetCaretPosition(Position.PositionStart);
             await InvokeAsync(StateHasChanged).ConfigureAwait(true);
         }
         private async void RenderTextNumberedList()
         {
             htmlBuilder.RenderBlockElement(HTMLConstants.UlTag);
+            htmlBuilder.SetCaretPosition(Position.PositionStart);
             await InvokeAsync(StateHasChanged).ConfigureAwait(true);
         }
         private void RenderTextIncrease()
@@ -659,6 +951,7 @@ namespace BlazorHtmlEditor
         private async void RenderBlockElement()
         {
             htmlBuilder.RenderBlockElement(activeBlockElement.NodeName);
+            htmlBuilder.SetCaretPosition(Position.PositionStart);
             await InvokeAsync(StateHasChanged).ConfigureAwait(true);           
         }
         public void Dispose()

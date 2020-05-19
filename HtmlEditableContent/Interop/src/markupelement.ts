@@ -45,20 +45,26 @@ export class MarkUpElement {
         }
     }
 
+    private IsLastElementChild(elem:HTMLElement): boolean
+    {
+        return document.lastElementChild === elem;
+    }
+
     private async InsertNewLine(id: string)
     {
         const elem = document.getElementById(id);
         const editableElem = this.editableDivNode(elem);
         let tag = 'div';
         let inTheMiddle: boolean;
+        let endOfDocumentInLi: boolean;
+        endOfDocumentInLi = false;
         if (editableElem) {
-
             const rangeNode = this.elementRange.createCursorRange(editableElem, this.activeSelection.positionStart);
-
             if (rangeNode) {
                 const activeNode = rangeNode[1]
                 if (activeNode.parentElement.nodeName === 'LI')
                 {
+                    endOfDocumentInLi = (rangeNode[0].startOffset === activeNode.textContent.length) && (this.elementRange.IsLastChild(elem, rangeNode[1]))
                     tag = 'li'
                 }
                 inTheMiddle = true;
@@ -72,6 +78,19 @@ export class MarkUpElement {
                 newTag.innerHTML = "\u200B";
                 if (!inTheMiddle) {
                     activeNode.parentElement.insertAdjacentElement('afterend', newTag);
+                    if (endOfDocumentInLi)
+                    {
+                        let parentli = activeNode.parentElement;
+                        while (parentli && parentli.nodeName !== 'OL')
+                        {
+                            parentli = parentli.parentElement;
+                        };
+                        if (parentli) {
+                            const newExtraTag = document.createElement('div');
+                            newExtraTag.innerHTML = "\u200B";
+                            parentli.insertAdjacentElement('afterend', newExtraTag);
+                        }
+                    }
                 }
                 else
                 {
