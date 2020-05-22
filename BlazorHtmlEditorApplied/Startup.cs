@@ -1,12 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using EmbeddedBlazorContent;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -46,10 +39,7 @@ namespace BlazorHtmlEditorApplied
 
             app.UseHttpsRedirection();
             app.UseStaticFiles();
-            app.UseEmbeddedBlazorContent(typeof(HtmlEditableContent.HtmlEditableContent).Assembly);
-            app.UseEmbeddedBlazorContent(typeof(BlazorHtmlEditor.HtmlEditor).Assembly);
             app.UseRouting();
-
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapBlazorHub();

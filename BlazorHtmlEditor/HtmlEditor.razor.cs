@@ -587,6 +587,7 @@ namespace BlazorHtmlEditor
                     }
                 }
                 await htmlBuilder.RenderStyle(cmd, () => DetermineAttributeValue()).ConfigureAwait(true);
+                htmlBuilder.SetCaretPosition(Position.PositionStart);
             }
 
         }
@@ -864,6 +865,7 @@ namespace BlazorHtmlEditor
             elem.SetAttribute("width", image.Width);
             void updateImage(RangeNode rangeNode)
             {
+                //System.Net.WebUtility.UrlEncode(image.Source)
                 var imgElem = rangeNode.Node.ParentElement;
                 imgElem.SetAttribute("src", image.Source);
                 imgElem.SetAttribute("alt", image.Description);
@@ -893,7 +895,7 @@ namespace BlazorHtmlEditor
             void updateLink(RangeNode rangeNode)
             {
                 var hRefElem = rangeNode.Node.ParentElement;
-                hRefElem.SetAttribute("href", link.Link);
+                hRefElem.SetAttribute("href", System.Net.WebUtility.UrlEncode(link.Link));
                 hRefElem.TextContent = link.Description;
             }
             htmlBuilder.SetCaretPosition(Position.PositionStart);

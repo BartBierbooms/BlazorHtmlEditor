@@ -18,7 +18,7 @@ namespace HtmlBuilder.Test
             var document = await Factory.DocumentFactory.GetDocument(html);
             var bodyNodes = document.Body.GetDescendants();
 
-            MarkUpRange selectionRange = new MarkUpRange() {  PositionStart = 5, PositionEnd = 7 };
+            MarkUpRange selectionRange = new MarkUpRange() { PositionStart = 5, PositionEnd = 7 };
 
             var ranges = RangeNode.InRange(bodyNodes, selectionRange);
             var range = ranges.First();
@@ -60,7 +60,7 @@ namespace HtmlBuilder.Test
             var document = await Factory.DocumentFactory.GetDocument(html);
             var bodyNodes = document.Body.GetDescendants();
 
-            MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 7, PositionStart = 5 };
+            MarkUpRange selectionRange = new MarkUpRange() { PositionStart = 5, PositionEnd = 7 };
 
             var ranges = RangeNode.InRange(bodyNodes, selectionRange);
             var range = ranges.First();
@@ -102,6 +102,36 @@ namespace HtmlBuilder.Test
             var document = await Factory.DocumentFactory.GetDocument(html);
             var bodyNodes = document.Body.GetDescendants();
 
+            MarkUpRange selectionRange = new MarkUpRange() { PositionStart = 5, PositionEnd = 7 };
+
+            var ranges = RangeNode.InRange(bodyNodes, selectionRange);
+            var range = ranges.First();
+
+            range.ApplyStyleCommand(selectionRange, EStyleCommand.Emphasis, document, RangeNode.ApplyAttributeValueNone);
+            var newHtml = document.Body.ToHtml();
+
+            document = await Factory.DocumentFactory.GetDocument(newHtml);
+            bodyNodes = document.Body.GetDescendants();
+
+            ranges = RangeNode.InRange(bodyNodes, selectionRange);
+            range = ranges.First();
+
+            range.ApplyStyleCommand(selectionRange, EStyleCommand.Bold, document, RangeNode.ApplyAttributeValueNone);
+            newHtml = document.Body.ToHtml();
+
+
+            Assert.AreEqual(newHtml, assertedHtml);
+            await Task.FromResult(0);
+        }
+
+        [Test]
+        public async Task EmphasisAndBoldHTML_CaretOnEmphasisAndBold_OnCommandEmphasisAndBold_HtmlIsRenderedAsNoEmphasisNorBold()
+        {
+            string html = @"<body><div>This <em><strong>is</strong></em> a test</div>";
+            string assertedHtml = @"<body><div>This is a test</div></body>";
+            var document = await Factory.DocumentFactory.GetDocument(html);
+            var bodyNodes = document.Body.GetDescendants();
+
             MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 7, PositionStart = 5 };
 
             var ranges = RangeNode.InRange(bodyNodes, selectionRange);
@@ -119,38 +149,6 @@ namespace HtmlBuilder.Test
             range.ApplyStyleCommand(selectionRange, EStyleCommand.Bold, document, RangeNode.ApplyAttributeValueNone);
             newHtml = document.Body.ToHtml();
 
-
-            Assert.IsTrue(ranges.Count() == 1);
-            Assert.AreEqual(newHtml, assertedHtml);
-            await Task.FromResult(0);
-        }
-
-        [Test]
-        public async Task EmphasisAndBoldHTML_CaretOnEmphasisAndBold_OnCommandEmphasisAndBold_HtmlIsRenderedAsNoEmphasisNorBold()
-        {
-            string html = @"<body><div>This <em><strong>is</strong></em> a test</div>";
-            string assertedHtml = @"<body><div>This is a test</div></body>";
-            var document = await Factory.DocumentFactory.GetDocument(html);
-            var bodyNodes = document.Body.GetDescendants();
-
-            MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 6, PositionStart = 6 };
-
-            var ranges = RangeNode.InRange(bodyNodes, selectionRange);
-            var range = ranges.First();
-
-            range.ApplyStyleCommand(selectionRange, EStyleCommand.Emphasis, document, RangeNode.ApplyAttributeValueNone);
-            var newHtml = document.Body.ToHtml();
-
-            document = await Factory.DocumentFactory.GetDocument(newHtml);
-            bodyNodes = document.Body.GetDescendants();
-
-            ranges = RangeNode.InRange(bodyNodes, selectionRange);
-            range = ranges.First();
-
-            range.ApplyStyleCommand(selectionRange, EStyleCommand.Bold, document, RangeNode.ApplyAttributeValueNone);
-            newHtml = document.Body.ToHtml();
-
-            Assert.IsTrue(ranges.Count() == 1);
             Assert.AreEqual(newHtml, assertedHtml);
             await Task.FromResult(0);
         }
@@ -186,5 +184,26 @@ namespace HtmlBuilder.Test
             await Task.FromResult(0);
 
         }
+        [Test]
+        public async Task EmphasisAndBoldHTML_CaretOnEmphasisAndBold_OnCommandEmphas_HtmlIsRenderedAsBold()
+        {
+
+            //<span><div>me <strong><em>and</em></strong> you​</div></span>
+            string html = @"<div>me <strong><em>and</em></strong> you​</div>";
+            string assertedHtml = @"<body><div>me <strong>and</strong> you​</div></body>";
+
+            var document = await Factory.DocumentFactory.GetDocument(html);
+            var bodyNodes = document.Body.GetDescendants();
+
+            MarkUpRange selectionRange = new MarkUpRange() { PositionStart = 5, PositionEnd = 5 };
+
+            var ranges = RangeNode.InRange(bodyNodes, selectionRange);
+            var range = ranges.First();
+
+            range.ApplyStyleCommand(selectionRange, EStyleCommand.Emphasis, document, RangeNode.ApplyAttributeValueNone);
+            var newHtml = document.Body.ToHtml();
+
+            Assert.AreEqual(newHtml, assertedHtml);
+        }
     }
-    }
+}

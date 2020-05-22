@@ -344,7 +344,7 @@ namespace HtmlBuilder.Test
             
             var em = document.CreateElement(HTMLConstants.EmTag);
             em.TextContent = "an emphasis";
-            range.InsertElementAtCurrentPosition(em, 6);
+            range.InsertElementAtCurrentPosition(document, em, 6);
             var newHtml = document.Body.ToHtml();
 
             Assert.IsTrue(ranges.Count() == 1);

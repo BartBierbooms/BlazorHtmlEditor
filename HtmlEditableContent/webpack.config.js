@@ -21,7 +21,7 @@ module.exports = (env, args) => ({
         "blazorHtmlBuilder": './interop/src/index.ts'
     },
     output: {
-        path: path.join(__dirname, '/content'),
+        path: path.join(__dirname, '/wwwroot'),
         filename: 'blazorHtmlBuilder.js'
     }
 });

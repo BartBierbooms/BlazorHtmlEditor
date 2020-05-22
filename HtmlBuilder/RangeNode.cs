@@ -64,44 +64,64 @@ namespace HtmlBuilder
             if(bodyNodes == null)
                 throw new ArgumentNullException(nameof(bodyNodes));
 
-            int offset = 0;
-            int iPosRangeStart = range.PositionStart == -1 ? 0 : range.PositionStart - 1;
-            int iPosRangeEnd = range.PositionEnd == -1 ? 0 : range.PositionEnd - 1;
             List<RangeNode> rangeNodes = new List<RangeNode>();
 
             if (bodyNodes.Count() == 1 && bodyNodes.First().NodeName == HTMLConstants.DivTag)
             {
                 rangeNodes.Add(new RangeNode(bodyNodes.First(), 0));
+                return rangeNodes;
             }
-            else
+
+            int offset = 0;
+            int iPosRangeStart = range.PositionStart == -1 ? 0 : range.PositionStart;
+            int iPosRangeEnd = range.PositionEnd == -1 ? 0 : range.PositionEnd;
+
+            var textNodes = bodyNodes.Where(n => n.NodeType == NodeType.Text);
+            foreach (var txtNode in textNodes)
             {
-                foreach (var node in bodyNodes)
+                if (offset > iPosRangeEnd)
+                    break;
+
+                string nodeText = txtNode.TextContent;
+                int iNodeLength = nodeText.Length;
+                if ((iPosRangeStart >= offset && iPosRangeStart < offset + iNodeLength))
                 {
-                    if (offset > iPosRangeEnd + 1)
-                        break;
-
-                    if (node.NodeType == NodeType.Text)
-                    {
-                        string nodeText = node.TextContent;
-                        int iNodeLength = nodeText.Length;
-                        int iRange = iPosRangeEnd - iPosRangeStart;
-
-                        bool rangeStartInNode = iPosRangeStart < offset || (iPosRangeStart + 1) < offset + iNodeLength;
-                        bool rangeEndInNode = iPosRangeEnd >= offset || iPosRangeEnd == iPosRangeStart;
-
-                        if (iPosRangeEnd == 0 && iPosRangeStart == 0)
-                        {
-                            rangeNodes.Add(new RangeNode(node, offset));
-                        }
-                        else if (rangeStartInNode && rangeEndInNode)
-                        {
-                            rangeNodes.Add(new RangeNode(node, offset));
-                        }
-                        offset += iNodeLength;
-                    }
+                    rangeNodes.Add(new RangeNode(txtNode, offset));
                 }
+                else if ((iPosRangeEnd >= offset && iPosRangeEnd < offset + iNodeLength))
+                {
+                    rangeNodes.Add(new RangeNode(txtNode, offset));
+                }
+                offset += iNodeLength;
             }
             return rangeNodes;
+
+            //    foreach (var node in bodyNodes)
+            //    {
+            //        if (offset > iPosRangeEnd + 1)
+            //            break;
+
+            //        if (node.NodeType == NodeType.Text)
+            //        {
+            //            string nodeText = node.TextContent;
+            //            int iNodeLength = nodeText.Length;
+            //            int iRange = iPosRangeEnd - iPosRangeStart;
+            //            bool rangeStartInNode = iPosRangeStart <= offset || (iPosRangeStart + 1) <= offset + iNodeLength;
+            //            //bool rangeStartInNode = iPosRangeStart < offset || (iPosRangeStart + 1) < offset + iNodeLength;
+            //            bool rangeEndInNode = iPosRangeEnd >= offset || iPosRangeEnd == iPosRangeStart;
+
+            //            if (iPosRangeEnd == 0 && iPosRangeStart == 0)
+            //            {
+            //                rangeNodes.Add(new RangeNode(node, offset));
+            //            }
+            //            else if (rangeStartInNode && rangeEndInNode)
+            //            {
+            //                rangeNodes.Add(new RangeNode(node, offset));
+            //            }
+            //            offset += iNodeLength;
+            //        }
+            //    }
+            //}
         }
 
         /// <summary>
@@ -110,8 +130,11 @@ namespace HtmlBuilder
         /// <param name="elem">The HTML element.</param>
         /// <param name="startPos">The position to insert the element.</param>
         /// <param name="insertAfter">The element is inserted after the element at the gibvne start position.</param>
-        public void InsertElementAtCurrentPosition(IElement elem, int startPos, bool insertAfter = false)
+        public void InsertElementAtCurrentPosition(IDocument document, IElement elem, int startPos, bool insertAfter = false)
         {
+            if (document == null)
+                throw new ArgumentException(nameof(document));
+
             var parent = Node.ParentElement;
             var nodes = FindBeforeAndAfterNodes(parent, Node);
             var nodesAfter = nodes.nodesAfter;
@@ -120,14 +143,16 @@ namespace HtmlBuilder
             INode[] CreateNewNodes() 
             {
                 string nodeText = Node.TextContent;
+                int nodeLength = nodeText.Length;
                 int nodeOffset = startPos - Offset;
-                if (nodeOffset == 0 && !insertAfter)
+                
+                if (nodeOffset == 0 && !insertAfter && Node.ParentElement != null)
                 {
                     var cloneBefore = Node.Clone();
                     cloneBefore.PrependNodes(new[] { elem });
                     return new[] { cloneBefore };
                 }
-                else if (nodeOffset == Node.TextContent.Length || insertAfter)
+                else if (Node.NodeType == NodeType.Element && nodeOffset == nodeLength || insertAfter)
                 {
                     var cloneAfter = Node.Clone();
                     cloneAfter.AppendChild(elem);
@@ -178,7 +203,23 @@ namespace HtmlBuilder
                     || (parentNodeName.ToUpper(ciInvariant) == HTMLConstants.LiTag && 
                         (blockCommand == HTMLConstants.UlTag || blockCommand == HTMLConstants.OlTag)))
                 {
-                    return  document.CreateElement("div");
+                    //if UL and Command = OL or vice versa than replace UL by OL
+                    var containingNode = NodeWalkGetParentOfElementNode(blockParentElement);
+                    if ((containingNode.NodeName == HTMLConstants.UlTag && blockCommand == HTMLConstants.UlTag)
+                        || (containingNode.NodeName == HTMLConstants.OlTag && blockCommand == HTMLConstants.OlTag))
+                    {
+                        var list = CreateListHolder(document, blockCommand == HTMLConstants.UlTag);
+                        list.AppendNodes(containingNode.ChildNodes.ToArray());
+
+                        CopyAttributes(containingNode as IElement, list);
+                        containingNode.ReplaceWith(list);
+                        
+                        return null;
+                    }
+                    else
+                    {
+                        return document.CreateElement("div");
+                    }
                 }
                 else
                 {
@@ -311,6 +352,7 @@ namespace HtmlBuilder
             int rangeLength = (range.PositionEnd - range.PositionStart);
             int posEndWord = range.PositionEnd - Offset;
             int posStartWord = range.PositionStart > Offset ? range.PositionStart - Offset : 0;
+
             string nodeText = Node.TextContent;
             int nodeTextLength = Node.TextContent.Length;
             IElement newElement = null;
@@ -393,18 +435,10 @@ namespace HtmlBuilder
                         }
                         else 
                         {
-                            var elementIndex = adjacentElements.IndexOf(element);
-                            if (elementIndex > 0 )
-                            {
-                                adjacentElements[elementIndex - 1].RemoveChild(element);
-                                adjacentElements[elementIndex].TextContent = nodeText;
-                                parentElementOfAdjacentBlock.ReplaceChild(adjacentElements[elementIndex].Clone(), adjacentElement);
-                            }
-                            else
-                            {
-                                adjacentElement.RemoveChild(element);
-                                adjacentElement.TextContent = nodeText;
-                            }
+                            var elemToRemove = adjacentElements.First(e => e.NodeName == (cmd == EStyleCommand.Bold ? HTMLConstants.StrongTag : HTMLConstants.EmTag));
+                            var leftOverElem = adjacentElements.Except(new[] { elemToRemove }).First();
+                            leftOverElem.TextContent = nodeText;
+                            parentElementOfAdjacentBlock.ReplaceChild(leftOverElem.Clone(), adjacentElement);
                         }
                         return;
                     }
@@ -450,7 +484,7 @@ namespace HtmlBuilder
 
             Node.TextContent = nodeText.Substring(0, posStartWord);
             var restNode = Node.Clone();
-            restNode.TextContent = nodeText.Substring(posStartWord + posEndWord);
+            restNode.TextContent = nodeText.Substring((posStartWord) + posEndWord);
             Node.ReplaceWith(new[] { Node.Clone(), newElement, restNode });
 
         }
@@ -550,6 +584,9 @@ namespace HtmlBuilder
                 var nodesAfter = nodes.nodesAfter;
                 var nodesBefore = nodes.nodesBefore;
                 IElement elem = createElement();
+                if (elem == null)
+                    return;
+
                 var isComposite = elem.FirstChild != null;
 
                 CopyAttributes(walkFindElementOfNode.Node as IElement, elem);

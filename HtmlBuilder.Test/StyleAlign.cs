@@ -38,7 +38,7 @@ namespace HtmlBuilder.Test
             var document = await Factory.DocumentFactory.GetDocument(html);
             var bodyNodes = document.Body.GetDescendants();
 
-            MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 6, PositionStart = 6 };
+            MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 7, PositionStart = 7 };
 
             var ranges = RangeNode.InRange(bodyNodes, selectionRange);
             var range = ranges.First();

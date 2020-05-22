@@ -52,7 +52,7 @@ namespace HtmlEditableContent
             if (!inRangeNodes.Any())
             {
                 var rangeNode = new RangeNode(document.Body.FirstElementChild.LastChild, range.PositionStart);
-                rangeNode.InsertElementAtCurrentPosition(elem, range.PositionStart, true);
+                rangeNode.InsertElementAtCurrentPosition(document, elem, range.PositionStart, true);
                 DocumentToMarkUpString();
                 await InvokeAsync(StateHasChanged);
             }
@@ -65,7 +65,7 @@ namespace HtmlEditableContent
                 }
                 else
                 {
-                    node.InsertElementAtCurrentPosition(elem, range.PositionStart);
+                    node.InsertElementAtCurrentPosition(document, elem, range.PositionStart);
                 }
                 DocumentToMarkUpString();
                 await InvokeAsync(StateHasChanged);
