@@ -54,7 +54,7 @@ namespace HtmlEditableContent
                 var rangeNode = new RangeNode(document.Body.FirstElementChild.LastChild, range.PositionStart);
                 rangeNode.InsertElementAtCurrentPosition(document, elem, range.PositionStart, true);
                 DocumentToMarkUpString();
-                await InvokeAsync(StateHasChanged);
+                await InvokeAsync(StateHasChanged).ConfigureAwait(true); 
             }
             else if (inRangeNodes.Any() && inRangeNodes.Count() == 1)
             {
@@ -68,14 +68,19 @@ namespace HtmlEditableContent
                     node.InsertElementAtCurrentPosition(document, elem, range.PositionStart);
                 }
                 DocumentToMarkUpString();
-                await InvokeAsync(StateHasChanged);
+                await InvokeAsync(StateHasChanged).ConfigureAwait(true); 
             }
+        }
+        public async void SetHtml(string html) 
+        {
+            Html = html;
+            await InvokeAsync(StateHasChanged).ConfigureAwait(true);
         }
         public async void Reset() 
         {
              const string hardSpace = "\u200B";
              Html = $@"<div>{HttpUtility.HtmlDecode(hardSpace)}</div>";
-             await InvokeAsync(StateHasChanged);
+             await InvokeAsync(StateHasChanged).ConfigureAwait(true); 
         }
         public async Task RenderStyle(EStyleCommand cmd, Func<string> determineAttributeValue) 
         {
@@ -92,14 +97,14 @@ namespace HtmlEditableContent
                     rangeNode.ApplyStyleCommand(range, cmd, document, determineAttributeValue);
                 }
                 DocumentToMarkUpString();
-                await InvokeAsync(StateHasChanged);
+                await InvokeAsync(StateHasChanged).ConfigureAwait(true);
             }
         }
         public async Task SetDocument(IDocument newDocument) 
         {
             document = newDocument;
             DocumentToMarkUpString();
-            await InvokeAsync(StateHasChanged);
+            await InvokeAsync(StateHasChanged).ConfigureAwait(true); ;
         }
         public async Task<IDocument> GetDocument()
         {
@@ -109,6 +114,23 @@ namespace HtmlEditableContent
         public void SetCaretPosition(int pos) 
         {
             CaretPosition = pos;
+        }
+        public async void RenderClass(string className) 
+        {
+            var documentAndMarkUp = await GetDocumentAndRange();
+            var range = documentAndMarkUp.Item2;
+            document = documentAndMarkUp.Item1;
+            var bodyNodes = document.Body.GetDescendantsAndSelf();
+            var inRangeNodes = RangeNode.InRange(bodyNodes, range);
+            if (inRangeNodes.Any())
+            {
+                foreach (var rangeNode in inRangeNodes)
+                {
+                    rangeNode.ApplyClass(className);
+                }
+            }
+            DocumentToMarkUpString();
+            await InvokeAsync(StateHasChanged).ConfigureAwait(true); ;
         }
         public async void RenderBlockElement(string blockElement) 
         {
@@ -125,7 +147,7 @@ namespace HtmlEditableContent
                 }
             }
             DocumentToMarkUpString();
-            await InvokeAsync(StateHasChanged);
+            await InvokeAsync(StateHasChanged).ConfigureAwait(true); 
         }
         #endregion
         private void DocumentToMarkUpString()
@@ -151,19 +173,19 @@ namespace HtmlEditableContent
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
-
             await base.OnAfterRenderAsync(firstRender);
             if (firstRender)
             {
                 var config = Configuration.Default;
                 var context = BrowsingContext.New(config);
-
                 document = await context.OpenAsync(req => req.Content(Html));
-                //var sheet = await context.GetCssStyling().ParseStylesheetAsync(new AngleSharp.Io.DefaultResponse(), new StyleOptions(document), new System.Threading.CancellationToken());
                 await HtmlBuilderInterop.AddEventListener(JSRuntime, Id);
-                RazorInstances.BuilderInstances.Add(idGuid, this);
+
+                //Console.WriteLine($"editable content initialize {idGuid}");
+                RazorInstances.AddBuilderInstance(idGuid, this);
             }
             await HtmlBuilderInterop.SetContent(JSRuntime, Id, $"<span>{Html}</span>", CaretPosition == -1 ? 0 : CaretPosition, CaretPosition == -1 ? 0 : CaretPosition);
+            
         }
        
         protected override void BuildRenderTree(RenderTreeBuilder builder)
@@ -174,9 +196,19 @@ namespace HtmlEditableContent
             builder.AddAttribute(++seq, "class", "editor-edit-area");
             builder.AddAttribute(++seq, "contenteditable", true);
             builder.CloseElement();
-            //Console.WriteLine(Html);
         }
 
+        [JSInvokable]
+        public static async Task OnDoubleClickElement(MarkUpRangeElement rangeElement)
+        {
+            var activeEditor = RazorInstances.ActiveEditorInstance(new Guid(rangeElement.Id));
+            if (activeEditor != null)
+            {
+                await activeEditor.ElementDblClicked(rangeElement);
+            }
+            await Task.FromResult(0);
+        }
+        
         [JSInvokable]
         public static async Task SelectionChanged(MarkUpRange range)
         {

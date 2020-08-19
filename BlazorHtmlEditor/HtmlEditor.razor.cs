@@ -16,13 +16,33 @@ namespace BlazorHtmlEditor
 {
     partial class HtmlEditor : ComponentBase, IHtmlEditor, IDisposable
     {
+        public const string HardSpace = "\u200B";
+        public async Task<MarkupString> GetHtml() 
+        {
+            var document = await htmlBuilder.GetDocument().ConfigureAwait(true);
+            source = document.Body.FirstElementChild.ToHtml();
+            return new MarkupString(source);
+        }
+
         [Inject]
         public IJSRuntime JSRuntime { get; set; }
+        
+        [Parameter] 
+        public EventCallback<string> OnDoubleClick { get; set; }
+
+        [Parameter]
+        public bool FullEditor { get; set; } = true;
+
+        [Parameter]
+        public MarkupString Html { get ; set; } = (MarkupString)$@"<div>{HttpUtility.HtmlDecode(HardSpace)}</div>";
+
+        [Parameter]
+        public string Id { get; set; } = Guid.NewGuid().ToString().Replace("-", "", StringComparison.InvariantCulture);
 
         [Parameter]
         public BlockElement[] BlockStylings { get; set; }
-        
-        [Parameter] 
+
+        [Parameter]
         public EventCallback<string> OnSave { get; set; }
 
         [Parameter]
@@ -30,20 +50,22 @@ namespace BlazorHtmlEditor
 
         [Parameter]
         public FontStyle[] FontStylings { get; set; }
+
+
         public MarkUpRange Position { get; set; } = new MarkUpRange() { PositionEnd = 0, PositionStart = 0 };
 
         #region menu
-        private BaseMatButton FileMnuButton;
-        private BaseMatButton EditMnuButton;
-        private BaseMatButton ViewMnuButton;
-        private BaseMatMenu MnuFile;
-        private BaseMatMenu MnuEdit;
-        private BaseMatMenu MnuView;
+        private BaseMatButton FileMnuButton { get; set; }
+        private BaseMatButton EditMnuButton { get; set; }
+        private BaseMatButton ViewMnuButton { get; set; }
+        private BaseMatMenu MnuFile { get; set; }
+        private BaseMatMenu MnuEdit { get; set; }
+        private BaseMatMenu MnuView { get; set; }
 
-        private async void OnMnuItemSourceClick() 
+        private async void OnMnuItemSourceClick()
         {
             var document = await htmlBuilder.GetDocument().ConfigureAwait(true);
-            source = document.Body.FirstElementChild.ToHtml(); 
+            source = document.Body.FirstElementChild.ToHtml();
             sourceDialog = true;
             await InvokeAsync(StateHasChanged).ConfigureAwait(true);
         }
@@ -98,20 +120,21 @@ namespace BlazorHtmlEditor
         private static List<string> AudioPreLoadValues => new List<string>(new[] { "auto", "metadata", "none" });
 
         private string selector = "";
-        private string Selector { get {
+        private string Selector
+        {
+            get
+            {
                 if (selector.Length > 10)
                     return $"path: { selector.Substring(10)}";
                 return "";
             }
             set => selector = value;
         }
-        private string id { get; } = Guid.NewGuid().ToString().Replace("-", "", StringComparison.InvariantCulture);
         private bool showColorGrid { get; set; } = false;
-        private const string hardSpace = "\u200B";
         private bool showBackGroundColorGrid { get; set; } = false;
 
         //private MarkupString html = (MarkupString)$@"<style>html, body {{font-family: 'Courier';}}</style><div>{HttpUtility.HtmlDecode(hardSpace)}</div>";
-        private MarkupString html = (MarkupString)$@"<div>{HttpUtility.HtmlDecode(hardSpace)}</div>";
+
         private string source { get; set; }
         private MarkupString exampleHtml { get; set; }
 
@@ -126,7 +149,10 @@ namespace BlazorHtmlEditor
 
         private int _imageTabIndex;
         private int _audioTabIndex;
-        private int imageTabIndex { get => _imageTabIndex; set {
+        private int imageTabIndex
+        {
+            get => _imageTabIndex; set
+            {
                 if (value == 1)
                 {
                     Task.Run(
@@ -141,7 +167,7 @@ namespace BlazorHtmlEditor
                 {
                     _imageTabIndex = value;
                 }
-            } 
+            }
         }
         private int audioTabIndex
         {
@@ -293,16 +319,19 @@ namespace BlazorHtmlEditor
             }
         }
         private IHtmlBuilder _htmlBuilder = null;
-        private IHtmlBuilder htmlBuilder {
-            get 
+        private IHtmlBuilder htmlBuilder
+        {
+            get
             {
                 if (_htmlBuilder == null)
                 {
-                    _htmlBuilder = RazorInstances.ActiveBuilderInstance(new Guid(id));
+                    _htmlBuilder = RazorInstances.ActiveBuilderInstance(new Guid(Id));
                 }
                 return _htmlBuilder;
             }
         }
+
+
         #region HtmlEditorInterface
         public async Task PositionChanged(MarkUpRange range)
         {
@@ -311,21 +340,31 @@ namespace BlazorHtmlEditor
             await InvokeAsync(StateHasChanged).ConfigureAwait(true);
         }
 
+        public async Task ElementDblClicked(MarkUpRangeElement rangeElement)
+        {
+            if (rangeElement != null)
+            {
+                await OnDoubleClick.InvokeAsync(rangeElement.TextContent).ConfigureAwait(true);
+            }
+        }
         # endregion
         protected override async Task OnInitializedAsync()
         {
             await base.OnInitializedAsync().ConfigureAwait(true);
-            RazorInstances.EditorInstances.Add(new Guid(id), this);
+            RazorInstances.AddEditorInstance(new Guid(Id), this);
         }
+
         protected override Task OnParametersSetAsync()
         {
-            if (BlockStylings != null && BlockStylings.Any()) 
+
+            if (BlockStylings != null && BlockStylings.Any())
             {
                 if (!BlockStylings.Any(n => n.NodeName == null))
                 {
                     BlockElements = (new[] { BlockElement.None }).Concat(BlockStylings).ToArray();
                 }
-                else {
+                else
+                {
                     BlockElements = BlockStylings;
                 }
             }
@@ -344,14 +383,13 @@ namespace BlazorHtmlEditor
             {
                 if (!EditorColors.Any(n => string.IsNullOrEmpty(n.Name)))
                 {
-                    Colors = (new[] { Color.None }).Concat(EditorColors).ToArray();
                 }
                 else
                 {
                     Colors = EditorColors;
                 }
             }
-                
+
             ActiveFontStyle = FontStyles.First();
             fontNames = FontStyles.Skip(1).Select(f => f.TechName).ToList();
 
@@ -459,7 +497,7 @@ namespace BlazorHtmlEditor
         private async Task SetCurrentStyles()
         {
 
-            if(htmlBuilder == null || htmlBuilder.Document == null)
+            if (htmlBuilder == null || htmlBuilder.Document == null)
                 return;
 
             var document = await htmlBuilder.GetDocument().ConfigureAwait(true);
@@ -528,7 +566,7 @@ namespace BlazorHtmlEditor
             else
             {
 
-                if (!string.IsNullOrWhiteSpace( activeBlockElement.NodeName))
+                if (!string.IsNullOrWhiteSpace(activeBlockElement.NodeName))
                 {
                     activeBlockElement = BlockElements.First();
                     StateHasChanged();
@@ -558,7 +596,7 @@ namespace BlazorHtmlEditor
 
         private async void RenderStyle(EStyleCommand cmd)
         {
-            if (htmlBuilder != null) 
+            if (htmlBuilder != null)
             {
                 string DetermineAttributeValue()
                 {
@@ -623,16 +661,16 @@ namespace BlazorHtmlEditor
             var elems = document.QuerySelectorAll("img");
             return (from e in elems
                     select new Image()
-                    { 
-                        Description =e.GetAttribute("alt"),
-                        Height= e.GetAttribute("heigth"),
-                        Width= e.GetAttribute("width"),
-                        Source= e.GetAttribute("src")
+                    {
+                        Description = e.GetAttribute("alt"),
+                        Height = e.GetAttribute("heigth"),
+                        Width = e.GetAttribute("width"),
+                        Source = e.GetAttribute("src")
                     }).ToList();
-            
+
 
         }
-        private void MakeActiveImage(Image img) 
+        private void MakeActiveImage(Image img)
         {
             image = img;
             img.EditMode = true;
@@ -650,7 +688,7 @@ namespace BlazorHtmlEditor
             document.QuerySelectorAll("audio").ElementAt(audios.IndexOf(audio)).RemoveFromParent();
             await htmlBuilder.SetDocument(document).ConfigureAwait(true);
         }
-        private async void RemoveImage() 
+        private async void RemoveImage()
         {
             var document = await htmlBuilder.GetDocument().ConfigureAwait(true);
             document.QuerySelectorAll("img").ElementAt(images.IndexOf(image)).RemoveFromParent();
@@ -709,11 +747,11 @@ namespace BlazorHtmlEditor
         {
             var document = await htmlBuilder.GetDocument().ConfigureAwait(true);
             var img = document.QuerySelectorAll("img").ElementAt(images.IndexOf(image));
-            if (string.IsNullOrWhiteSpace(image.Description)) 
+            if (string.IsNullOrWhiteSpace(image.Description))
             {
                 img.RemoveAttribute("alt");
             }
-            else 
+            else
             {
                 img.SetAttribute("alt", image.Description);
             }
@@ -721,7 +759,7 @@ namespace BlazorHtmlEditor
             {
                 img.RemoveAttribute("height");
             }
-            else 
+            else
             {
                 img.SetAttribute("height", image.Height);
             }
@@ -757,11 +795,11 @@ namespace BlazorHtmlEditor
             }
             var elem = htmlBuilder.Document.CreateElement("audio");
             elem.SetAttribute("src", audio.Source);
-            if (audio.Autoplay) 
+            if (audio.Autoplay)
             {
                 elem.SetAttribute("autoplay", "autoplay");
             }
-            else 
+            else
             {
                 elem.RemoveAttribute("autoplay");
             }
@@ -842,7 +880,7 @@ namespace BlazorHtmlEditor
             htmlBuilder.SetCaretPosition(Position.PositionStart);
             await htmlBuilder.InsertOrUpdateElementAtCurrentPosition(elem, rn => isAudioNode(rn), updateAudio).ConfigureAwait(true);
         }
-        private async Task RenderImage(bool cancelled) 
+        private async Task RenderImage(bool cancelled)
         {
             imageDialog = false;
             if (cancelled)
@@ -851,9 +889,11 @@ namespace BlazorHtmlEditor
                 return;
             }
 
-            bool isImageNode(RangeNode rn) {
+            bool isImageNode(RangeNode rn)
+            {
                 var sibling = rn.Node?.NextSibling?.NodeName == "IMG";
-                if (sibling) {
+                if (sibling)
+                {
                     return Position.PositionStart == Position.PositionEnd && Position.PositionStart == rn.Offset + rn.Node.TextContent.Length - 1;
                 }
                 return false;
@@ -888,7 +928,7 @@ namespace BlazorHtmlEditor
             var elem = htmlBuilder.Document.CreateElement("a");
             elem.SetAttribute("href", link.Link);
             elem.TextContent = link.Description;
-            if (!string.IsNullOrWhiteSpace(link.Target)) 
+            if (!string.IsNullOrWhiteSpace(link.Target))
             {
                 elem.SetAttribute("target", link.Target);
             }
@@ -934,6 +974,19 @@ namespace BlazorHtmlEditor
         {
             RenderStyle(EStyleCommand.TextAlignJustify);
         }
+        private async void RenderTitleMenu()
+        {
+            htmlBuilder.RenderClass("mat_title");
+            htmlBuilder.SetCaretPosition(Position.PositionStart);
+            await InvokeAsync(StateHasChanged).ConfigureAwait(true);
+        }
+        private async void RenderTextFieldsMenu()
+        {
+            htmlBuilder.RenderClass("mat-subtitle2");
+            htmlBuilder.SetCaretPosition(Position.PositionStart);
+            await InvokeAsync(StateHasChanged).ConfigureAwait(true);
+        }
+
         private void RenderBold()
         {
             RenderStyle(EStyleCommand.Bold);
@@ -952,14 +1005,24 @@ namespace BlazorHtmlEditor
         }
         private async void RenderBlockElement()
         {
-            htmlBuilder.RenderBlockElement(activeBlockElement.NodeName);
-            htmlBuilder.SetCaretPosition(Position.PositionStart);
-            await InvokeAsync(StateHasChanged).ConfigureAwait(true);           
+            if (!string.IsNullOrWhiteSpace(activeBlockElement.NodeName))
+            {
+                if (activeBlockElement.IsClass)
+                {
+                    htmlBuilder.RenderClass(activeBlockElement.NodeName);
+                }
+                else
+                {
+                    htmlBuilder.RenderBlockElement(activeBlockElement.NodeName);
+
+                }
+                htmlBuilder.SetCaretPosition(Position.PositionStart);
+                await InvokeAsync(StateHasChanged).ConfigureAwait(true);
+            }
         }
         public void Dispose()
         {
-            RazorInstances.EditorInstances.Remove(new Guid(id));
+            RazorInstances.EditorInstances.Remove(new Guid(Id));
         }
-
     }
 }

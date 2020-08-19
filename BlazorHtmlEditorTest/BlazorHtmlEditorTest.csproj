@@ -6,8 +6,9 @@
     <TypeScriptToolsVersion>3.8</TypeScriptToolsVersion>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="AngleSharp" Version="0.14.0-alpha-805" />
-    <PackageReference Include="MatBlazor" Version="2.2.0" />
+    <PackageReference Include="AngleSharp" Version="0.14.0" />
+    <PackageReference Include="MatBlazor" Version="2.6.0" />
+    <PackageReference Include="System.Text.Json" Version="4.7.2" />
   </ItemGroup>
 
   <ItemGroup>

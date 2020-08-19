@@ -1,13 +1,10 @@
 ﻿using BlazorHtmlEditor;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 
-namespace BlazorHtmlEditorApplied.Pages
+namespace BlazorHtmlEditorTest.Pages
 {
-    partial class HtmlEditor
+    partial class HtmlEditorSmall
     {
         public BlockElement[] BlockStylings { get; private set; }
         public FontStyle[] FontStylings { get; private set; }

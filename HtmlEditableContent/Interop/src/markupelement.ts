@@ -1,5 +1,6 @@
 ﻿import { MarkUpElementRange } from "./markupelementrange";
 import { MarkUpRange } from "./markuprange";
+import { MarkUpRangeElement } from "./markuprangeelement";
 import { MarkUpValueChange } from "./markupelementchange";
 import { MarkUpValue } from "./markupvalue";
 
@@ -192,6 +193,7 @@ export class MarkUpElement {
             elem.removeEventListener('keyup', () => { });
             elem.removeEventListener('keydown', () => { });
             elem.removeEventListener('mouseup', () => { });
+            elem.removeEventListener('dblclick', () => { });
         }
     }
 
@@ -229,6 +231,36 @@ export class MarkUpElement {
                 await this.selectionChanged(elem, id);
             });
 
+            elem.addEventListener('dblclick', async (e) => {
+                if (e.target !== e.currentTarget) {
+                    // Get the #id of clicked node
+                    const clickedNode = (e.target as Node)
+                    if (clickedNode)
+                    {
+                        let elementClicked: HTMLElement = null;
+                        if (clickedNode.nodeType === clickedNode.TEXT_NODE) {
+                            elementClicked = clickedNode.parentElement;
+                        }
+                        else if (clickedNode.nodeType === clickedNode.ELEMENT_NODE)
+                        {
+                            elementClicked = clickedNode as HTMLElement;
+                        }
+                        if (elementClicked)
+                        {
+                            const posOnChange = this.elementRange.getCaretPosition(elem);
+                            if (posOnChange.length === 2) {
+                                const mrkUpRangeElement = new MarkUpRangeElement(posOnChange[0], posOnChange[1], id, elementClicked.tagName, elementClicked.textContent);
+                                try {
+                                    await DotNet.invokeMethodAsync('HtmlEditableContent', 'OnDoubleClickElement', mrkUpRangeElement);
+                                } catch (e) {
+                                    console.log('there was an error');
+                                    console.log(e);
+                                }
+                            }
+                        }
+                    }
+                }  
+            });
             elem.addEventListener('keydown', (event) => {
                 if (event.key === "Enter") {
                     event.cancelBubble = true;

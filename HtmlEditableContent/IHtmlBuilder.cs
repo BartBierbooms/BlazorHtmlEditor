@@ -11,9 +11,11 @@ namespace HtmlEditableContent
     public interface IHtmlBuilder
     {
         void Reset();
+        void SetHtml(string html);
         IDocument Document { get; }
         Task RenderStyle(EStyleCommand cmd, Func<string> determineAttributeValue);
         void RenderBlockElement(string nodeName);
+        void RenderClass(string className);
         Task<IDocument> GetDocument();
         Task SetDocument(IDocument newDocument);
         MarkUpRange Position { get; set; }
@@ -23,5 +25,7 @@ namespace HtmlEditableContent
     public interface IHtmlEditor
     {
         Task PositionChanged(MarkUpRange range);
+        Task ElementDblClicked(MarkUpRangeElement rangeElement);
     }
+
 }

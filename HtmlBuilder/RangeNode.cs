@@ -1,5 +1,7 @@
-﻿using AngleSharp.Dom;
+﻿using AngleSharp.Css;
+using AngleSharp.Dom;
 using AngleSharp.Html.Dom;
+using AngleSharp.Text;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -88,7 +90,7 @@ namespace HtmlBuilder
                 {
                     rangeNodes.Add(new RangeNode(txtNode, offset));
                 }
-                else if ((iPosRangeEnd >= offset && iPosRangeEnd < offset + iNodeLength))
+                else if ((iPosRangeEnd > offset && iPosRangeEnd < offset + iNodeLength))
                 {
                     rangeNodes.Add(new RangeNode(txtNode, offset));
                 }
@@ -177,6 +179,36 @@ namespace HtmlBuilder
             Node.ReplaceWith(allnodes);
         }
 
+        public void ApplyClass(string className) 
+        {
+            var blockParentElement = NodeWalkFindBlockParent(Node) as IElement;
+            if (!blockParentElement.HasAttribute("class"))
+            {
+                blockParentElement.SetAttribute("class", className);
+            }
+            else 
+            {
+                var classValue = blockParentElement.GetAttribute("class");
+                var classes = classValue.SplitSpaces();
+                var classNameInElem = classes.FirstOrDefault(n => n.Equals(className.Trim(), StringComparison.InvariantCultureIgnoreCase));
+                if (classNameInElem == null)
+                {
+                    blockParentElement.SetAttribute("class", $"{string.Join(" ", classes)} {className}");
+                }
+                else 
+                {
+                    var rest = string.Join(" ", classes.Except(new[] { classNameInElem }));
+                    if (rest.Length > 0)
+                    {
+                        blockParentElement.SetAttribute("class", className);
+                    }
+                    else 
+                    {
+                        blockParentElement.RemoveAttribute("class");
+                    }
+                }
+            }
+        }
         /// <summary>
         /// Applies the given command on a given element. 
         /// <example>
@@ -386,7 +418,7 @@ namespace HtmlBuilder
                 return;
 
             var poslength = posEndWord - posStartWord;
-            if (poslength == 0)
+            if (poslength == 0 )
                 poslength = 1;
 
             string extractedTextRange = nodeText.Substring(posStartWord, poslength);
@@ -408,7 +440,7 @@ namespace HtmlBuilder
             }
             posEndWord = extractedTextRange.Length;
 
-            if (ExtractedRangeEqualsTextRange(extractedTextRange, nodeText) || isCmdForBlockElement)
+            if (ExtractedRangeEqualsTextRange(extractedTextRange, nodeText) || isCmdForBlockElement || ToggleContainingElement(element, cmd))
             {
                 if (isCmdToggle)
                 {
@@ -522,7 +554,8 @@ namespace HtmlBuilder
                         }
                         else
                         {
-                            element.ParentElement.ReplaceChild(strong, element);
+                            element.TextContent = "";
+                            element.Insert(AdjacentPosition.AfterBegin, strong.OuterHtml);
                         }
                     }
                     break;
@@ -543,7 +576,8 @@ namespace HtmlBuilder
                         }
                         else
                         {
-                            element.ParentElement.ReplaceChild(em, element);
+                            element.TextContent = "";
+                            element.Insert(AdjacentPosition.AfterBegin, em.OuterHtml);
                         }
                     }
                     break;
@@ -935,6 +969,19 @@ namespace HtmlBuilder
                    where s.Split(':').Length == 2
                    select new StyleProperty() { Prp = s.Split(':')[0].Trim(), Val = s.Split(':')[1].Replace(";", null, StringComparison.InvariantCulture).Trim() };
         }
+        private static bool ToggleContainingElement(IElement element, EStyleCommand cmd) 
+        {
+            if (cmd == EStyleCommand.Bold) 
+            {
+                return element.NodeName == HTMLConstants.StrongTag;
+            }
+
+            if (cmd == EStyleCommand.Emphasis)
+            {
+                return element.NodeName == HTMLConstants.EmTag;
+            }
+            return false;
+        }
         private static bool ExtractedRangeEqualsTextRange(string extractedWord, string textNode)
         {
             return extractedWord == textNode;
@@ -964,7 +1011,10 @@ namespace HtmlBuilder
         private static bool ContainsZeroCharachtersOrOnlyWhiteSpaces(int offset, int rangeLength, string nodeText)
         {
             string spaceCharacter;
-            if (offset == 0 && rangeLength == 0)
+            if (rangeLength == -1)
+                return true;
+
+            if (offset == 0 && (rangeLength == 0))
                 return false;
 
             if (offset + rangeLength < nodeText.Length)
@@ -1104,7 +1154,7 @@ namespace HtmlBuilder
             return node;
         }
 
-        private bool ApplyToggle(List<IElement> adjacentElements, EStyleCommand cmd) 
+        private static bool ApplyToggle(List<IElement> adjacentElements, EStyleCommand cmd) 
         {
             return adjacentElements.Any(elem => elem.NodeName == (cmd == EStyleCommand.Bold ? HTMLConstants.StrongTag : HTMLConstants.EmTag));
         }

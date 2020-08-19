@@ -50,5 +50,70 @@ namespace HtmlBuilder.Test
             Assert.AreEqual(newHtml, assertedHtml);
             await Task.FromResult(0);
         }
+        [Test]
+        public async Task EagerEditor_ApplyStyleItalic()
+        {
+
+            var html = @"<span><div class=""mat_title"">ikke​</div></span>";
+            string assertedHtml = @"<body><span><div class=""mat_title""><em>ikke​</em></div></span></body>";
+            var document = await Factory.DocumentFactory.GetDocument(html);
+            var bodyNodes = document.Body.GetDescendants();
+
+            MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 3, PositionStart = 3 };
+
+            var ranges = RangeNode.InRange(bodyNodes, selectionRange);
+            var range = ranges.First();
+            range.ApplyStyleCommand(selectionRange, EStyleCommand.Emphasis, document, () => "");
+
+            var newHtml = document.Body.ToHtml();
+
+            Assert.IsTrue(ranges.Count() == 1);
+            Assert.AreEqual(newHtml, assertedHtml);
+            await Task.FromResult(0);
+        }
+        [Test]
+        public async Task EagerEditor_ApplyToggleStyleBold()
+        {
+
+            var html = @"<span><div>​ikke <strong>en </strong>jij</div></span>";
+            string assertedHtml = @"<body><span><div>​ikke en jij</div></span></body>";
+            var document = await Factory.DocumentFactory.GetDocument(html);
+            var bodyNodes = document.Body.GetDescendants();
+
+            MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 9, PositionStart = 6 };
+
+            var ranges = RangeNode.InRange(bodyNodes, selectionRange);
+            var range = ranges.First();
+            range.ApplyStyleCommand(selectionRange, EStyleCommand.Bold, document, () => "");
+
+            var newHtml = document.Body.ToHtml();
+
+            Assert.IsTrue(ranges.Count() == 1);
+            Assert.AreEqual(newHtml, assertedHtml);
+            await Task.FromResult(0);
+        }
+
+        [Test]
+        public async Task DivWithStyleMultiplWords_ApplyToggleStyleEmphasisOnMiddleWord_ToggleStylesForCompleteRange()
+        {
+
+            var html = @"<span><div><em>​ikke en jij</em></div></span>";
+            string assertedHtml = @"<body><span><div>​ikke en jij</div></span></body>";
+            var document = await Factory.DocumentFactory.GetDocument(html);
+            var bodyNodes = document.Body.GetDescendants();
+
+            MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 6, PositionStart = 6 };
+
+            var ranges = RangeNode.InRange(bodyNodes, selectionRange);
+            var range = ranges.First();
+            range.ApplyStyleCommand(selectionRange, EStyleCommand.Emphasis, document, () => "");
+
+            var newHtml = document.Body.ToHtml();
+
+            Assert.IsTrue(ranges.Count() == 1);
+            Assert.AreEqual(newHtml, assertedHtml);
+            await Task.FromResult(0);
+        }
+
     }
 }

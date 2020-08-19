@@ -354,5 +354,23 @@ namespace HtmlBuilder.Test
         }
         #endregion
 
+        [Test]
+        public async Task EagerEditor_ApplyStyle()
+        {
+            var html = @"<span><div>ikke</div></span>";
+            string assertedHtml = @"<body><span><div class=""mat_title"">ikke</div></span></body>";
+            var bodyNodes = await base.bodyNodes(html);
+
+            MarkUpRange selectionRange = new MarkUpRange() { PositionEnd = 3, PositionStart = 3 };
+
+            var ranges = RangeNode.InRange(bodyNodes, selectionRange);
+            ranges.First().ApplyClass("mat_title");
+
+            var newHtml = document.Body.ToHtml();
+
+            Assert.IsTrue(ranges.Count() == 1);
+            Assert.AreEqual(newHtml, assertedHtml);
+            await Task.FromResult(0);
+        }
     }
 }

@@ -108,7 +108,7 @@ app {
 }
 
     .sidebar .top-row {
-        background-color: rgba(0,0,0,0.4);
+        background-color: ivory;
     }
 
     .sidebar .navbar-brand {
@@ -159,7 +159,8 @@ app {
 }
 
 .navbar-toggler {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(60, 60, 60, 0.5);
+    margin-left: 1.0rem;
 }
 
 .valid.modified:not([type=checkbox]) {
