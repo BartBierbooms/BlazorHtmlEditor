@@ -624,7 +624,12 @@ namespace BlazorHtmlEditor
                             return "";
                     }
                 }
-                await htmlBuilder.RenderStyle(cmd, () => DetermineAttributeValue()).ConfigureAwait(true);
+                var pos = await htmlBuilder.RenderStyle(cmd, () => DetermineAttributeValue()).ConfigureAwait(true);
+                if (pos > -1)
+                {
+                    Position.PositionStart += (pos - Position.PositionStart);
+                    Position.PositionEnd += (pos - Position.PositionEnd);
+                }
                 htmlBuilder.SetCaretPosition(Position.PositionStart);
             }
 
@@ -1014,10 +1019,13 @@ namespace BlazorHtmlEditor
                 else
                 {
                     htmlBuilder.RenderBlockElement(activeBlockElement.NodeName);
-
                 }
                 htmlBuilder.SetCaretPosition(Position.PositionStart);
                 await InvokeAsync(StateHasChanged).ConfigureAwait(true);
+            }
+            else 
+            {
+                htmlBuilder.RenderBlockElement(HTMLConstants.DivTag);
             }
         }
         public void Dispose()

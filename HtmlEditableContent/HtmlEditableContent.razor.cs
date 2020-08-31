@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.JSInterop;
 using System.Web;
 using AngleSharp.Css;
+using AngleSharp.Html.Dom;
 
 namespace HtmlEditableContent
 {
@@ -27,6 +28,8 @@ namespace HtmlEditableContent
             } 
         }
         public MarkUpRange Position { get; set; } = new MarkUpRange() { PositionEnd = 0, PositionStart = 0 };
+        private const string hardSpace = "\u200B";
+        private const string altSpace = "&#8203;";
 
         private string _id;
         private Guid idGuid;
@@ -51,7 +54,7 @@ namespace HtmlEditableContent
             var inRangeNodes = RangeNode.InRange(bodyNodes, range);
             if (!inRangeNodes.Any())
             {
-                var rangeNode = new RangeNode(document.Body.FirstElementChild.LastChild, range.PositionStart);
+                var rangeNode = new RangeNode(document.Body.FirstElementChild.LastChild, range.PositionStart, false);
                 rangeNode.InsertElementAtCurrentPosition(document, elem, range.PositionStart, true);
                 DocumentToMarkUpString();
                 await InvokeAsync(StateHasChanged).ConfigureAwait(true); 
@@ -78,11 +81,10 @@ namespace HtmlEditableContent
         }
         public async void Reset() 
         {
-             const string hardSpace = "\u200B";
              Html = $@"<div>{HttpUtility.HtmlDecode(hardSpace)}</div>";
              await InvokeAsync(StateHasChanged).ConfigureAwait(true); 
         }
-        public async Task RenderStyle(EStyleCommand cmd, Func<string> determineAttributeValue) 
+        public async Task<int> RenderStyle(EStyleCommand cmd, Func<string> determineAttributeValue)
         {
             var documentAndMarkUp = await GetDocumentAndRange();
 
@@ -90,16 +92,30 @@ namespace HtmlEditableContent
             document = documentAndMarkUp.Item1;
             var bodyNodes = document.Body.GetDescendantsAndSelf();
             var inRangeNodes = RangeNode.InRange(bodyNodes, range);
+            int newPos = -1;
             if (inRangeNodes.Any())
             {
                 foreach (var rangeNode in inRangeNodes)
                 {
                     rangeNode.ApplyStyleCommand(range, cmd, document, determineAttributeValue);
+                    //If at the end a new range with a hardspace will be added
+                    if (rangeNode.AtEnd)
+                    {
+                        newPos = range.PositionEnd + 1;
+                    }
                 }
-                DocumentToMarkUpString();
-                await InvokeAsync(StateHasChanged).ConfigureAwait(true);
             }
+            else
+            {
+                var newRangeNode = new RangeNode(bodyNodes.Last(), range.PositionEnd, true);
+                newRangeNode.ApplyStyleCommand(range, cmd, document, determineAttributeValue);
+                newPos = newRangeNode.Offset;
+            }
+            DocumentToMarkUpString();
+            await InvokeAsync(StateHasChanged).ConfigureAwait(true);
+            return newPos;
         }
+
         public async Task SetDocument(IDocument newDocument) 
         {
             document = newDocument;
@@ -145,6 +161,11 @@ namespace HtmlEditableContent
                 {
                     rangeNode.ApplyBlockCommand(blockElement, document);
                 }
+            }
+            else 
+            {
+                var newRangeNode = new RangeNode(bodyNodes.Last(), range.PositionEnd, true);
+                newRangeNode.ApplyBlockCommand(blockElement, document);
             }
             DocumentToMarkUpString();
             await InvokeAsync(StateHasChanged).ConfigureAwait(true); 

@@ -61,7 +61,7 @@
             <MatIconButton Disabled="disableHRefLink" OnClick="@(() => hRefLinkDialog = true)" Title="Hyperlink" Class="editor-toolbar-button" Icon="@MatIconNames.Link"></MatIconButton>
         </div>
         <HtmlEditableContent.HtmlBuilderEditableContentBase Html="@Html.Value" Id="@Id"></HtmlEditableContent.HtmlBuilderEditableContentBase>
-        <div class="editor-edit-bottom"><div>pos: @Position.PositionStart / @Position.PositionEnd <span>path: @Selector</span></div></div>
+        <div class="editor-edit-bottom"><div>text pos: @Position.PositionStart / @Position.PositionEnd <span>path: @Selector</span></div></div>
     }
     else
     {

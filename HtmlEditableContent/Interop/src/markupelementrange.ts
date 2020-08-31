@@ -134,10 +134,10 @@
     //   (if start === end, caret is at given position and no text is selected)
     public getCaretPosition(elem: HTMLElement): number[] {
         const sel: Selection = window.getSelection();
-        let cumLength = [0, 0];
+        let cumLength = [0, 0, sel.anchorOffset, sel.focusOffset];
 
         if (sel.anchorNode === elem) {
-            cumLength = [sel.anchorOffset, sel.focusOffset];
+            cumLength = [sel.anchorOffset, sel.focusOffset, sel.anchorOffset, sel.focusOffset];
         }
         else {
             const nodesToFind = [sel.anchorNode, sel.focusNode];
@@ -170,7 +170,7 @@
         if (cumLength[0] <= cumLength[1])
             return cumLength;
 
-        return [cumLength[1], cumLength[0]];
+        return [cumLength[1], cumLength[0], sel.anchorOffset, sel.focusOffset];
     }
 
 }

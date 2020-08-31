@@ -1,12 +1,16 @@
 ﻿export class MarkUpRange {
-    constructor(positionStart: number, positionEnd: number, id: string) {      
+    constructor(positionStart: number, positionEnd: number, anchorStart: number, focusStart: number, id: string) {      
         this.positionEnd = positionEnd;
         this.positionStart = positionStart;
+        this.anchorStart = anchorStart;
+        this.focusStart = focusStart;
         this.id = id;
     }
     public id: string
     public positionStart: number;
     public positionEnd: number;
+    public anchorStart: number;
+    public focusStart: number;
 
     public IsSelection(): boolean {
         return this.positionEnd !== this.positionStart

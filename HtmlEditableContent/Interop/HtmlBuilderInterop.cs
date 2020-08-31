@@ -19,6 +19,7 @@ namespace HtmlEditableContent.Interop
                 "blazorHtmlBuilder.MarkUpElement.SetPosition", new object[] { id, position}
             );
         }
+
         public static async ValueTask<MarkUpRange> GetCaretPosition(IJSRuntime JSRuntime, string id)
         {
             return await JSRuntime.InvokeAsync<MarkUpRange>(

@@ -13,8 +13,10 @@ namespace HtmlBuilder
         public MarkUpRange() { }
         public int PositionStart { get; set; }
         public int PositionEnd { get; set; }
+        public int AnchorStart { get; set; }
+        public int FocusStart { get; set; }
         public string Id { get; set; }
         public bool NoSelection => PositionEnd == PositionStart || PositionEnd <= 0;
-
+        public bool CaretSelectionAtStart => (AnchorStart == FocusStart) && AnchorStart == 0;
     }
 }

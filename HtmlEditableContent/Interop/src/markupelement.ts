@@ -11,11 +11,11 @@ export class MarkUpElement {
     private activeSelection: MarkUpRange;
     private elementRange: MarkUpElementRange;
     private observer: MutationObserver;
-    private unkownPos: MarkUpRange = new MarkUpRange(-1, -1, "");
+    private unkownPos: MarkUpRange = new MarkUpRange(-1, -1, -1, -1, "");
 
     constructor() {
         this.elementRange = new MarkUpElementRange
-        this.activeSelection = new MarkUpRange(-1, -1, "");
+        this.activeSelection = new MarkUpRange(-1, -1, -1, -1, "");
     }
 
     private getElement(id: string): HTMLElement {
@@ -25,7 +25,7 @@ export class MarkUpElement {
     public GetPosition(id: string): MarkUpRange {
         const pos = this.elementRange.getCaretPosition(this.getElement(id));
         if (pos) {
-            return new MarkUpRange(pos[0], pos[1], id);
+            return new MarkUpRange(pos[0], pos[1], pos[2], pos[3], id);
         }
         return this.unkownPos;
     }
@@ -50,7 +50,6 @@ export class MarkUpElement {
     {
         return document.lastElementChild === elem;
     }
-
     private async InsertNewLine(id: string)
     {
         const elem = document.getElementById(id);
@@ -199,9 +198,9 @@ export class MarkUpElement {
 
     async elemContentChanged(id: string, elem: HTMLElement) {
         const posOnChange = this.elementRange.getCaretPosition(elem);
-        if (posOnChange && posOnChange.length === 2) {
+        if (posOnChange && posOnChange.length === 4){
             const changed = new MarkUpValueChange();
-            this.activeSelection = new MarkUpRange(posOnChange[0], posOnChange[1], id);
+            this.activeSelection = new MarkUpRange(posOnChange[0], posOnChange[1], posOnChange[2], posOnChange[3], id);
             changed.Init(id, elem.textContent, elem.innerHTML, this.activeSelection);
         }
     }
@@ -211,8 +210,8 @@ export class MarkUpElement {
             return;
 
         const posOnChange = this.elementRange.getCaretPosition(elem);
-        if (posOnChange.length === 2) {
-            this.activeSelection = new MarkUpRange(posOnChange[0], posOnChange[1], id);
+        if (posOnChange.length === 4) {
+            this.activeSelection = new MarkUpRange(posOnChange[0], posOnChange[1], posOnChange[2], posOnChange[3], id);
             try {
                 await DotNet.invokeMethodAsync('HtmlEditableContent', 'SelectionChanged', this.activeSelection);
             } catch (e) {
@@ -248,8 +247,8 @@ export class MarkUpElement {
                         if (elementClicked)
                         {
                             const posOnChange = this.elementRange.getCaretPosition(elem);
-                            if (posOnChange.length === 2) {
-                                const mrkUpRangeElement = new MarkUpRangeElement(posOnChange[0], posOnChange[1], id, elementClicked.tagName, elementClicked.textContent);
+                            if (posOnChange.length === 4) {
+                                const mrkUpRangeElement = new MarkUpRangeElement(posOnChange[0], posOnChange[1], posOnChange[2], posOnChange[3], id, elementClicked.tagName, elementClicked.textContent);
                                 try {
                                     await DotNet.invokeMethodAsync('HtmlEditableContent', 'OnDoubleClickElement', mrkUpRangeElement);
                                 } catch (e) {

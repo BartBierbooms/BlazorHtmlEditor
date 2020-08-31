@@ -13,7 +13,7 @@ namespace HtmlEditableContent
         void Reset();
         void SetHtml(string html);
         IDocument Document { get; }
-        Task RenderStyle(EStyleCommand cmd, Func<string> determineAttributeValue);
+        Task<int> RenderStyle(EStyleCommand cmd, Func<string> determineAttributeValue);
         void RenderBlockElement(string nodeName);
         void RenderClass(string className);
         Task<IDocument> GetDocument();

@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Web;
 
 [assembly: InternalsVisibleTo("HtmlBuilder.Test")]
 namespace HtmlBuilder
@@ -16,10 +17,12 @@ namespace HtmlBuilder
     public class RangeNode
     {
         private const string InvalidOperationErr = "No continuation function defined.";
-        
+        private const string altSpace = "&#8203;";
+
         internal static Func<string> ApplyAttributeValueNone = () => "";
         public INode Node { get; private set; }
         public int Offset { get; private set; }
+        public bool AtEnd { get; private set; }
         private string styleattribute = null;
 
         /// <summary>
@@ -46,10 +49,11 @@ namespace HtmlBuilder
         /// Get attributes of a Html elment as key/value pairs
         /// </summary>
         public IEnumerable<StyleProperty> Styling => StyleProperties(StyleAttribute);
-        public RangeNode(INode node, int offSet)
+        public RangeNode(INode node, int offSet, bool atEnd)
         {
             Node = node;
             Offset = offSet;
+            AtEnd = atEnd;
         }
 
         /// <summary>
@@ -63,14 +67,14 @@ namespace HtmlBuilder
             if (range == null)
                 throw new ArgumentNullException(nameof(range));
 
-            if(bodyNodes == null)
+            if (bodyNodes == null)
                 throw new ArgumentNullException(nameof(bodyNodes));
 
             List<RangeNode> rangeNodes = new List<RangeNode>();
 
             if (bodyNodes.Count() == 1 && bodyNodes.First().NodeName == HTMLConstants.DivTag)
             {
-                rangeNodes.Add(new RangeNode(bodyNodes.First(), 0));
+                rangeNodes.Add(new RangeNode(bodyNodes.First(), 0, true)); //? atend
                 return rangeNodes;
             }
 
@@ -86,13 +90,24 @@ namespace HtmlBuilder
 
                 string nodeText = txtNode.TextContent;
                 int iNodeLength = nodeText.Length;
-                if ((iPosRangeStart >= offset && iPosRangeStart < offset + iNodeLength))
+                int selLength = offset + iNodeLength;
+                if ((iPosRangeStart >= offset && iPosRangeStart < selLength))
                 {
-                    rangeNodes.Add(new RangeNode(txtNode, offset));
+                    if (iPosRangeStart == offset && range.CaretSelectionAtStart)
+                    {
+                        rangeNodes.Add(new RangeNode(txtNode, offset, (iPosRangeStart == iPosRangeEnd) && (iPosRangeStart == selLength)));
+                    }
+                    else if(iPosRangeStart > offset)
+                    {
+                        rangeNodes.Add(new RangeNode(txtNode, offset, (iPosRangeStart == iPosRangeEnd) && (iPosRangeStart == selLength)));
+                    }
                 }
-                else if ((iPosRangeEnd > offset && iPosRangeEnd < offset + iNodeLength))
+                else if (iPosRangeEnd > offset)
                 {
-                    rangeNodes.Add(new RangeNode(txtNode, offset));
+                    if (iPosRangeEnd <= offset + iNodeLength && !range.CaretSelectionAtStart)
+                    {
+                        rangeNodes.Add(new RangeNode(txtNode, offset, (iPosRangeStart == iPosRangeEnd) && (iPosRangeStart == selLength)));
+                    }
                 }
                 offset += iNodeLength;
             }
@@ -142,19 +157,24 @@ namespace HtmlBuilder
             var nodesAfter = nodes.nodesAfter;
             var nodesBefore = nodes.nodesBefore;
 
-            INode[] CreateNewNodes() 
+            INode[] CreateNewNodes()
             {
                 string nodeText = Node.TextContent;
                 int nodeLength = nodeText.Length;
                 int nodeOffset = startPos - Offset;
-                
-                if (nodeOffset == 0 && !insertAfter && Node.ParentElement != null)
+
+                if (insertAfter) 
+                {
+                    return new[] { Node.Clone(), elem };
+                }
+
+                if (nodeOffset == 0 && Node.ParentElement != null)
                 {
                     var cloneBefore = Node.Clone();
                     cloneBefore.PrependNodes(new[] { elem });
                     return new[] { cloneBefore };
                 }
-                else if (Node.NodeType == NodeType.Element && nodeOffset == nodeLength || insertAfter)
+                else if (Node.NodeType == NodeType.Element && nodeOffset == nodeLength || Node.NodeType == NodeType.Element)
                 {
                     var cloneAfter = Node.Clone();
                     cloneAfter.AppendChild(elem);
@@ -162,31 +182,57 @@ namespace HtmlBuilder
                 }
                 else
                 {
-                    if (nodeOffset > -1)
+                    if (nodeOffset > -1 )
                     {
                         Node.TextContent = nodeText.Substring(0, nodeOffset);
                         var restNode = Node.Clone();
                         restNode.TextContent = nodeText.Substring(nodeOffset);
                         return new[] { Node.Clone(), elem, restNode };
                     }
-                    else {
-                        return new[] { Node.Clone(), elem};
+                    else
+                    {
+                        return new[] { Node.Clone(), elem };
                     }
                 }
             }
-            var insertNodes = CreateNewNodes();
-            var allnodes = nodesBefore.Concat(insertNodes).Concat(nodesAfter).ToArray();
-            Node.ReplaceWith(allnodes);
+            if (!nodesBefore.Any() && !nodesAfter.Any())
+            {
+                IElement appendHtml;
+                if (Node is IElement)
+                {
+                    appendHtml = Node as IElement;
+                }
+                else 
+                {
+                    appendHtml = Node.ParentElement as IElement;
+                }
+                var isTheSame = elem?.NodeName == appendHtml.NodeName;
+                if (isTheSame)
+                {
+                    var node = document.CreateTextNode(elem.TextContent);
+                    appendHtml.InsertAfter(node);
+                }
+                else
+                {
+                    appendHtml.AppendElement(elem);
+                }
+            }
+            else
+            {
+                var insertNodes = CreateNewNodes();
+                var allnodes = nodesBefore.Concat(insertNodes).Concat(nodesAfter).ToArray();
+                Node.ReplaceWith(allnodes);
+            }
         }
 
-        public void ApplyClass(string className) 
+        public void ApplyClass(string className)
         {
             var blockParentElement = NodeWalkFindBlockParent(Node) as IElement;
             if (!blockParentElement.HasAttribute("class"))
             {
                 blockParentElement.SetAttribute("class", className);
             }
-            else 
+            else
             {
                 var classValue = blockParentElement.GetAttribute("class");
                 var classes = classValue.SplitSpaces();
@@ -195,14 +241,14 @@ namespace HtmlBuilder
                 {
                     blockParentElement.SetAttribute("class", $"{string.Join(" ", classes)} {className}");
                 }
-                else 
+                else
                 {
                     var rest = string.Join(" ", classes.Except(new[] { classNameInElem }));
                     if (rest.Length > 0)
                     {
                         blockParentElement.SetAttribute("class", className);
                     }
-                    else 
+                    else
                     {
                         blockParentElement.RemoveAttribute("class");
                     }
@@ -230,9 +276,9 @@ namespace HtmlBuilder
 
             IElement createNewElem()
             {
-                if (string.IsNullOrEmpty(blockCommand) 
+                if (string.IsNullOrEmpty(blockCommand)
                     || blockCommand.ToLower(ciInvariant) == parentNodeName
-                    || (parentNodeName.ToUpper(ciInvariant) == HTMLConstants.LiTag && 
+                    || (parentNodeName.ToUpper(ciInvariant) == HTMLConstants.LiTag &&
                         (blockCommand == HTMLConstants.UlTag || blockCommand == HTMLConstants.OlTag)))
                 {
                     //if UL and Command = OL or vice versa than replace UL by OL
@@ -245,7 +291,7 @@ namespace HtmlBuilder
 
                         CopyAttributes(containingNode as IElement, list);
                         containingNode.ReplaceWith(list);
-                        
+
                         return null;
                     }
                     else
@@ -272,6 +318,7 @@ namespace HtmlBuilder
             ParentInsertNewElement(blockParentElement, createNewElem);
 
         }
+
         /// <summary>
         /// Applies/Unapplies style to the elements in the given range.
         /// </summary>
@@ -289,6 +336,16 @@ namespace HtmlBuilder
 
             if (attributeValue == null)
                 attributeValue = () => "";
+
+            //If at the end we consider this as an insert of a style
+            //Example: cursor is at the end of the range. Command Bold => next typed characters must be bold.
+            if (this.AtEnd) 
+            {
+                var elem = CreateElem(cmd, StyleAttribute, document, attributeValue);
+                elem.InnerHtml = HttpUtility.HtmlDecode(altSpace);
+                InsertElementAtCurrentPosition(document, elem, range.PositionEnd, true);
+                return;
+            }
 
             if (cmd == EStyleCommand.FormatClear)
             {
@@ -310,7 +367,7 @@ namespace HtmlBuilder
         /// Removes the style attribute from the Parentelement of the node.
         /// </summary>
         /// <param name="">IDocument</param>
-        public void RemoveStyleAttribute(IDocument document) 
+        public void RemoveStyleAttribute(IDocument document)
         {
             if (document == null)
                 throw new ArgumentNullException(nameof(document));
@@ -334,7 +391,7 @@ namespace HtmlBuilder
         /// </summary>
         /// <param name="cmd">A style command</param>
         /// <param name="attributeValue">The attribute value, that fits the style command</param>
-        public void SetStyleOnBlockElement(EStyleCommand cmd, Func<string> attributeValue) 
+        public void SetStyleOnBlockElement(EStyleCommand cmd, Func<string> attributeValue)
         {
             var isCmdForBlockElement = CommandIsBlockCommand(cmd);
 
@@ -371,7 +428,7 @@ namespace HtmlBuilder
         }
 
 
-        public void SetStyleOnInlineElement(MarkUpRange range, EStyleCommand cmd, IDocument document, Func<string> attributeValue) 
+        public void SetStyleOnInlineElement(MarkUpRange range, EStyleCommand cmd, IDocument document, Func<string> attributeValue)
         {
             if (range == null)
                 throw new ArgumentNullException(nameof(range));
@@ -397,7 +454,7 @@ namespace HtmlBuilder
             {
                 newElement = CreateElem(cmd, StyleAttribute, document, attributeValue);
             }
-            
+
             if (nodeText.Trim().Length == 0)
             {
                 return;
@@ -418,7 +475,7 @@ namespace HtmlBuilder
                 return;
 
             var poslength = posEndWord - posStartWord;
-            if (poslength == 0 )
+            if (poslength == 0)
                 poslength = 1;
 
             string extractedTextRange = nodeText.Substring(posStartWord, poslength);
@@ -454,9 +511,9 @@ namespace HtmlBuilder
                         INode[] nodesAfter = Enumerable.Empty<INode>().ToArray();
 
                         var adjacentElement = adjacentElements.First();
-                        
+
                         var parentElementOfAdjacentBlock = adjacentElement.ParentElement;
-                        
+
                         var nodeIndex = parentElementOfAdjacentBlock.IndexOf(adjacentElement);
                         nodesBefore = parentElementOfAdjacentBlock.ChildNodes.Take(nodeIndex).ToArray();
                         nodesAfter = parentElementOfAdjacentBlock.ChildNodes.Skip(nodeIndex + 1).ToArray();
@@ -465,7 +522,7 @@ namespace HtmlBuilder
                         {
                             element.ReplaceWith(document.CreateTextNode(element.TextContent));
                         }
-                        else 
+                        else
                         {
                             var elemToRemove = adjacentElements.First(e => e.NodeName == (cmd == EStyleCommand.Bold ? HTMLConstants.StrongTag : HTMLConstants.EmTag));
                             var leftOverElem = adjacentElements.Except(new[] { elemToRemove }).First();
@@ -685,7 +742,7 @@ namespace HtmlBuilder
 
         }
 
-        private static IElement CreateListHolder(IDocument document, bool ordered) 
+        private static IElement CreateListHolder(IDocument document, bool ordered)
         {
             var elem = document.CreateElement(ordered ? HTMLConstants.OlTag.ToLower(ciInvariant) : HTMLConstants.UlTag.ToLower(ciInvariant));
             return elem;
@@ -702,11 +759,11 @@ namespace HtmlBuilder
             }
         }
 
-        private static (INode[] nodesBefore, INode[] nodesAfter) FindBeforeAndAfterNodes(IElement parent, INode activeNode) 
+        private static (INode[] nodesBefore, INode[] nodesAfter) FindBeforeAndAfterNodes(IElement parent, INode activeNode)
         {
             INode[] nodesBefore = Enumerable.Empty<INode>().ToArray();
             INode[] nodesAfter = Enumerable.Empty<INode>().ToArray();
-            
+
             if (parent == activeNode)
                 return (nodesBefore, nodesAfter);
 
@@ -759,7 +816,8 @@ namespace HtmlBuilder
             List<IElement> adjacents = new List<IElement>();
             var nodeText = element.TextContent;
 
-            bool isAdjacent(INode node) {
+            bool isAdjacent(INode node)
+            {
                 var success = (node.NodeType == NodeType.Element && adjacentNodeNames.Contains(node.NodeName, StringComparer.CurrentCultureIgnoreCase) && node.TextContent == nodeText);
                 if (success)
                 {
@@ -783,7 +841,7 @@ namespace HtmlBuilder
             }
             if (node.NodeType == NodeType.Element && HTMLConstants.BlockElements.Any(n => n.Equals(node.NodeName.ToLower(ciInvariant), StringComparison.InvariantCulture)))
             {
-;                return true;
+                ; return true;
             }
             return false;
         }
@@ -820,8 +878,8 @@ namespace HtmlBuilder
                 || cmd == EStyleCommand.TextAlignRight
                 || cmd == EStyleCommand.Decrease
                 || cmd == EStyleCommand.Increase;
-                //|| cmd == EStyleCommand.BulletList
-                //|| cmd == EStyleCommand.NumberedList;
+            //|| cmd == EStyleCommand.BulletList
+            //|| cmd == EStyleCommand.NumberedList;
         }
         private static bool CommandIsToggleCommand(EStyleCommand cmd)
         {
@@ -853,7 +911,7 @@ namespace HtmlBuilder
             return null;
 
         }
-        private static short ParsePixel(string prpval) 
+        private static short ParsePixel(string prpval)
         {
             if (string.IsNullOrWhiteSpace(prpval))
                 return 0;
@@ -865,14 +923,14 @@ namespace HtmlBuilder
             }
             return 0;
         }
-        private static string SetPaddingInCreaseDecrease(string style, bool increase) 
+        private static string SetPaddingInCreaseDecrease(string style, bool increase)
         {
             const string padding = "padding-";
             string suffix = "left";
-            string calculatePaddingValue(int nr) 
+            string calculatePaddingValue(int nr)
             {
                 if (increase)
-                    return  $"{nr + 40}px";
+                    return $"{nr + 40}px";
 
                 if (nr >= 40)
                 {
@@ -895,7 +953,7 @@ namespace HtmlBuilder
                 {
                     paddingStyle = new StyleProperty() { Prp = $"{padding}{suffix}", Val = calculatePaddingValue(ParsePixel(current.Val.Trim())) };
                 }
-                
+
                 var newStyleElements = styleElements.Except(styleElements.Where(s => s.Prp == $"{padding}{suffix}")).Concat(new[] { paddingStyle });
                 foreach (var elem in newStyleElements)
                 {
@@ -969,9 +1027,9 @@ namespace HtmlBuilder
                    where s.Split(':').Length == 2
                    select new StyleProperty() { Prp = s.Split(':')[0].Trim(), Val = s.Split(':')[1].Replace(";", null, StringComparison.InvariantCulture).Trim() };
         }
-        private static bool ToggleContainingElement(IElement element, EStyleCommand cmd) 
+        private static bool ToggleContainingElement(IElement element, EStyleCommand cmd)
         {
-            if (cmd == EStyleCommand.Bold) 
+            if (cmd == EStyleCommand.Bold)
             {
                 return element.NodeName == HTMLConstants.StrongTag;
             }
@@ -1025,7 +1083,7 @@ namespace HtmlBuilder
             {
                 spaceCharacter = nodeText.Substring(offset).Trim();
             }
-            return string.IsNullOrEmpty( spaceCharacter);
+            return string.IsNullOrEmpty(spaceCharacter);
 
         }
         private static string GetElementName(EStyleCommand cmd)
@@ -1154,7 +1212,7 @@ namespace HtmlBuilder
             return node;
         }
 
-        private static bool ApplyToggle(List<IElement> adjacentElements, EStyleCommand cmd) 
+        private static bool ApplyToggle(List<IElement> adjacentElements, EStyleCommand cmd)
         {
             return adjacentElements.Any(elem => elem.NodeName == (cmd == EStyleCommand.Bold ? HTMLConstants.StrongTag : HTMLConstants.EmTag));
         }
